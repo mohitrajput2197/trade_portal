@@ -9,16 +9,19 @@ const app = express();
 const db = new Database('trade_data.db');
 const JWT_SECRET = 'apna_secret_key_12345';
 
+// OFFICE SECRET PASSCODE (Aap ise badal bhi sakte hain)
+const OFFICE_SECRET_CODE = 'OFFICE@2026';
+
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Database Setup & Auto Migration
+// Database Setup
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
-    email TEXT UNIQUE NOT NULL,
+    email TEXT UNIQUE NOT NULL, -- Yeh username/MCX ID store karega
     password TEXT NOT NULL,
     role TEXT DEFAULT 'member'
   );
@@ -28,6 +31,7 @@ db.exec(`
     user_id INTEGER NOT NULL,
     entry_date TEXT NOT NULL,
     day_name TEXT DEFAULT '',
+    script_name TEXT DEFAULT '',
     buy_val REAL NOT NULL DEFAULT 0,
     sell_val REAL NOT NULL DEFAULT 0,
     total_val REAL NOT NULL DEFAULT 0,
@@ -36,7 +40,6 @@ db.exec(`
   );
 `);
 
-// Safe table migration (Purani database file ke saath compatible banane ke liye)
 try { db.exec(`ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'member'`); } catch(e){}
 try { db.exec(`ALTER TABLE trade_entries ADD COLUMN day_name TEXT DEFAULT ''`); } catch(e){}
 try { db.exec(`ALTER TABLE trade_entries ADD COLUMN script_name TEXT DEFAULT ''`); } catch(e){}
@@ -58,31 +61,45 @@ function authMiddleware(req, res, next) {
   }
 }
 
-// 1. Register API
+// 1. Register API (Username / MCX ID Allowed)
 app.post('/api/register', async (req, res) => {
-  const { name, email, password } = req.body;
-  if (!name || !email || !password) {
-    return res.status(400).json({ error: 'Sabhi fields bharna zaroori hai' });
+  const { name, email, password, office_code } = req.body;
+  
+  if (!name || !email || !password || !office_code) {
+    return res.status(400).json({ error: 'Sabhi fields aur Office Code bharna zaroori hai' });
   }
+
+  // Office Passcode Check
+  if (office_code.trim() !== OFFICE_SECRET_CODE) {
+    return res.status(403).json({ error: 'Galat Office Passcode! Bahar ke users register nahi kar sakte.' });
+  }
+
   try {
     const totalUsers = db.prepare('SELECT COUNT(*) as count FROM users').get().count;
     const role = totalUsers === 0 ? 'admin' : 'member';
 
+    const cleanUsername = email.trim().toLowerCase();
     const hashedPassword = await bcrypt.hash(password, 10);
     const stmt = db.prepare('INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)');
-    stmt.run(name, email, hashedPassword, role);
+    stmt.run(name.trim(), cleanUsername, hashedPassword, role);
     res.json({ message: `Registration safal raha! (${role.toUpperCase()} Account). Ab login karein.` });
   } catch (err) {
-    res.status(400).json({ error: 'Email pehle se register hai.' });
+    res.status(400).json({ error: 'Yeh User ID / MCX ID pehle se registered hai.' });
   }
 });
 
-// 2. Login API
+// 2. Login API (Case-insensitive match for User/MCX ID)
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
-  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+  if (!email || !password) {
+    return res.status(400).json({ error: 'User ID aur Password dono dalein' });
+  }
+
+  const cleanUsername = email.trim().toLowerCase();
+  const user = db.prepare('SELECT * FROM users WHERE LOWER(email) = ?').get(cleanUsername);
+  
   if (!user || !(await bcrypt.compare(password, user.password))) {
-    return res.status(400).json({ error: 'Galat email ya password' });
+    return res.status(400).json({ error: 'Galat User ID ya Password' });
   }
   const token = jwt.sign({ id: user.id, name: user.name, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
   res.cookie('token', token, { httpOnly: true, sameSite: 'lax' });
@@ -95,13 +112,12 @@ app.post('/api/logout', (req, res) => {
   res.json({ message: 'Logged out' });
 });
 
-// Helper: Date string se Day Name nikalna
 function getDayNameFromDate(dateStr) {
   const dateObj = new Date(dateStr + 'T00:00:00');
   return dateObj.toLocaleDateString('en-US', { weekday: 'long' });
 }
 
-// 4. Save Entry API (With try/catch error reporting)
+// 4. Save Entry API (Buy + Sell Combine)
 app.post('/api/entries', authMiddleware, (req, res) => {
   try {
     const { entry_date, buy_val, sell_val } = req.body;
@@ -109,7 +125,7 @@ app.post('/api/entries', authMiddleware, (req, res) => {
 
     const buy = parseFloat(buy_val) || 0;
     const sell = parseFloat(sell_val) || 0;
-    const total = sell - buy;
+    const total = buy + sell;
     const dayName = getDayNameFromDate(entry_date);
 
     const stmt = db.prepare(`
@@ -132,7 +148,7 @@ app.put('/api/entries/:id', authMiddleware, (req, res) => {
 
     const buy = parseFloat(buy_val) || 0;
     const sell = parseFloat(sell_val) || 0;
-    const total = sell - buy;
+    const total = buy + sell;
     const dayName = getDayNameFromDate(entry_date);
 
     let stmt;
@@ -189,12 +205,12 @@ app.get('/api/entries', authMiddleware, (req, res) => {
   res.json({ user: req.user, entries });
 });
 
-// 7. Get All Members List (Sirf Admin ke liye)
+// 7. Get All Members List (Admin Only)
 app.get('/api/members', authMiddleware, (req, res) => {
   if (req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Access denied' });
   }
-  const members = db.prepare('SELECT id, name, email, role FROM users ORDER BY name ASC').all();
+  const members = db.prepare('SELECT id, name, email as username, role FROM users ORDER BY name ASC').all();
   res.json({ members });
 });
 
@@ -215,7 +231,7 @@ app.delete('/api/entries/:id', authMiddleware, (req, res) => {
   res.json({ success: true, message: 'Entry delete ho gayi!' });
 });
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });

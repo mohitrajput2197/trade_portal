@@ -2,73 +2,134 @@
 <html lang="hi">
 <head>
   <meta charset="UTF-8">
-  <title>Login / Signup - Trade Portal</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login / Member Registration - Trade Portal</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-900 text-white min-h-screen flex items-center justify-center p-4">
-  <div class="bg-slate-800 p-8 rounded-xl border border-slate-700 w-full max-w-md shadow-2xl">
-    <h2 id="title" class="text-2xl font-bold text-center mb-6 text-emerald-400">Member Login</h2>
 
-    <div class="space-y-4">
+  <div class="bg-slate-800 p-8 rounded-2xl border border-slate-700 w-full max-w-md shadow-2xl space-y-6">
+    
+    <div class="text-center">
+      <h1 class="text-2xl font-bold text-emerald-400">Trade Data Portal</h1>
+      <p class="text-xs text-amber-300 mt-1 font-medium">🔒 Internal Office Portal</p>
+    </div>
+
+    <!-- Toggle Tabs (Login vs Register) -->
+    <div class="flex bg-slate-950 p-1 rounded-xl border border-slate-700">
+      <button id="tabLogin" onclick="setMode(true)" class="w-1/2 py-2 text-sm font-semibold rounded-lg bg-emerald-500 text-slate-950 transition">
+        Login
+      </button>
+      <button id="tabRegister" onclick="setMode(false)" class="w-1/2 py-2 text-sm font-semibold rounded-lg text-slate-400 hover:text-white transition">
+        Office Staff Signup
+      </button>
+    </div>
+
+    <!-- Form -->
+    <form onsubmit="handleSubmit(event)" class="space-y-4">
       <div id="nameBox" class="hidden">
-        <label class="block text-sm text-slate-400 mb-1">Name</label>
-        <input type="text" id="name" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white outline-none focus:border-emerald-500">
-      </div>
-      <div>
-        <label class="block text-sm text-slate-400 mb-1">Email</label>
-        <input type="email" id="email" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white outline-none focus:border-emerald-500">
-      </div>
-      <div>
-        <label class="block text-sm text-slate-400 mb-1">Password</label>
-        <input type="password" id="password" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white outline-none focus:border-emerald-500">
+        <label class="block text-xs text-slate-400 mb-1">Staff Member Name</label>
+        <input type="text" id="name" placeholder="Rahul Sharma" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white outline-none focus:border-emerald-500">
       </div>
 
-      <button id="submitBtn" onclick="handleSubmit()" class="w-full bg-emerald-500 hover:bg-emerald-600 font-semibold py-2.5 rounded-lg transition mt-2">
+      <!-- Office Passcode Input (Sirf Signup par dikhega) -->
+      <div id="codeBox" class="hidden">
+        <label class="block text-xs text-amber-300 mb-1 font-semibold">🔑 Office Secret Passcode</label>
+        <input type="password" id="office_code" placeholder="Enter Office Code" class="w-full bg-slate-950 border border-amber-500/50 rounded-lg p-2.5 text-white outline-none focus:border-amber-400">
+        <p class="text-[11px] text-slate-400 mt-1">Sirf office members ke paas ye passcode hai.</p>
+      </div>
+
+      <!-- Email ki jagah Username / MCX ID -->
+      <div>
+        <label class="block text-xs text-slate-400 mb-1">User ID / MCX ID (e.g. mcx102)</label>
+        <input type="text" id="email" required placeholder="mcx102 ya email" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white outline-none focus:border-emerald-500">
+      </div>
+
+      <div>
+        <label class="block text-xs text-slate-400 mb-1">Password</label>
+        <input type="password" id="password" required placeholder="••••••••" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white outline-none focus:border-emerald-500">
+      </div>
+
+      <button type="submit" id="submitBtn" class="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-3 rounded-lg transition shadow-lg mt-2">
         Login Karein
       </button>
+    </form>
 
-      <p class="text-sm text-center text-slate-400 mt-4">
-        <span id="toggleText">Naye member hain?</span> 
-        <button onclick="toggleMode()" class="text-emerald-400 underline font-medium ml-1" id="toggleBtn">Signup karein</button>
-      </p>
-    </div>
+    <div id="statusMsg" class="text-xs text-center hidden p-2.5 rounded-lg"></div>
+
   </div>
 
   <script>
     let isLogin = true;
-    function toggleMode() {
-      isLogin = !isLogin;
-      document.getElementById('title').innerText = isLogin ? 'Member Login' : 'Naya Account Banayein';
-      document.getElementById('submitBtn').innerText = isLogin ? 'Login Karein' : 'Register Karein';
-      document.getElementById('nameBox').classList.toggle('hidden', isLogin);
-      document.getElementById('toggleText').innerText = isLogin ? 'Naye member hain?' : 'Pehle se account hai?';
-      document.getElementById('toggleBtn').innerText = isLogin ? 'Signup karein' : 'Login karein';
+
+    function setMode(loginMode) {
+      isLogin = loginMode;
+      const tabLogin = document.getElementById('tabLogin');
+      const tabRegister = document.getElementById('tabRegister');
+      const nameBox = document.getElementById('nameBox');
+      const codeBox = document.getElementById('codeBox');
+      const submitBtn = document.getElementById('submitBtn');
+      const statusMsg = document.getElementById('statusMsg');
+
+      statusMsg.classList.add('hidden');
+
+      if (isLogin) {
+        tabLogin.className = "w-1/2 py-2 text-sm font-semibold rounded-lg bg-emerald-500 text-slate-950 transition";
+        tabRegister.className = "w-1/2 py-2 text-sm font-semibold rounded-lg text-slate-400 hover:text-white transition";
+        nameBox.classList.add('hidden');
+        codeBox.classList.add('hidden');
+        document.getElementById('name').removeAttribute('required');
+        document.getElementById('office_code').removeAttribute('required');
+        submitBtn.innerText = "Login Karein";
+      } else {
+        tabRegister.className = "w-1/2 py-2 text-sm font-semibold rounded-lg bg-emerald-500 text-slate-950 transition";
+        tabLogin.className = "w-1/2 py-2 text-sm font-semibold rounded-lg text-slate-400 hover:text-white transition";
+        nameBox.classList.remove('hidden');
+        codeBox.classList.remove('hidden');
+        document.getElementById('name').setAttribute('required', 'true');
+        document.getElementById('office_code').setAttribute('required', 'true');
+        submitBtn.innerText = "Staff Account Banayein";
+      }
     }
 
-    async function handleSubmit() {
-      const email = document.getElementById('email').value;
+    async function handleSubmit(e) {
+      e.preventDefault();
+      const statusMsg = document.getElementById('statusMsg');
+      const email = document.getElementById('email').value; // Username / MCX ID
       const password = document.getElementById('password').value;
       const name = document.getElementById('name').value;
+      const office_code = document.getElementById('office_code').value;
 
       const url = isLogin ? '/api/login' : '/api/register';
-      const body = isLogin ? { email, password } : { name, email, password };
+      const body = isLogin ? { email, password } : { name, email, password, office_code };
 
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-      const data = await res.json();
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
 
-      if (res.ok) {
-        if (isLogin) {
-          window.location.href = '/dashboard.html';
+        if (res.ok) {
+          if (isLogin) {
+            window.location.href = '/dashboard.html';
+          } else {
+            statusMsg.className = "text-xs text-center p-2.5 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+            statusMsg.innerText = data.message || "Account ban gaya! Ab login karein.";
+            statusMsg.classList.remove('hidden');
+            setTimeout(() => setMode(true), 1500);
+          }
         } else {
-          alert(data.message);
-          toggleMode();
+          statusMsg.className = "text-xs text-center p-2.5 rounded-lg bg-rose-500/20 text-rose-400 border border-rose-500/30";
+          statusMsg.innerText = data.error || "Galat details ya passcode!";
+          statusMsg.classList.remove('hidden');
         }
-      } else {
-        alert(data.error);
+      } catch (err) {
+        statusMsg.className = "text-xs text-center p-2.5 rounded-lg bg-rose-500/20 text-rose-400 border border-rose-500/30";
+        statusMsg.innerText = "Server connection error.";
+        statusMsg.classList.remove('hidden');
       }
     }
   </script>
