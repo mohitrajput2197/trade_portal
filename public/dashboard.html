@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily Data Entry Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen">
+
+  <!-- Top Navbar -->
+  <nav class="bg-slate-800 border-b border-slate-700 px-6 py-4 flex justify-between items-center shadow-lg">
+    <div class="flex items-center gap-3">
+      <h1 class="text-xl font-bold text-emerald-400">Trade Data Portal</h1>
+      <span id="roleBadge" class="hidden text-xs px-2.5 py-0.5 rounded-full font-semibold"></span>
+    </div>
+    <div class="flex items-center gap-4">
+      <span id="userName" class="text-slate-300 font-medium"></span>
+      <button onclick="logout()" class="bg-rose-500 hover:bg-rose-600 text-sm px-3 py-1.5 rounded-md font-semibold transition">Logout</button>
+    </div>
+  </nav>
+
+  <div class="max-w-6xl mx-auto p-6 space-y-6">
+
+    <!-- 1. Daily Entry Form Card -->
+    <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-md">
+      <h2 class="text-lg font-semibold mb-4 text-emerald-300">Daily Trade Data Entry</h2>
+      <form id="entryForm" onsubmit="saveEntry(event)" class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Date</label>
+          <input type="date" id="entryDate" required min="2020-01-01" max="2035-12-31" onchange="updateDayDisplay()" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white outline-none focus:border-emerald-500">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Day Name (Auto)</label>
+          <input type="text" id="dayDisplay" readonly class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-emerald-400 font-semibold cursor-not-allowed">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">BuyVal</label>
+          <input type="number" step="0.01" id="buyVal" required placeholder="0.00" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white outline-none focus:border-emerald-500">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">SellVal</label>
+          <input type="number" step="0.01" id="sellVal" required placeholder="0.00" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white outline-none focus:border-emerald-500">
+        </div>
+        <div>
+          <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 font-medium py-2 rounded-lg transition shadow">Save Data</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- 2. Summary Cards (Total Buy & Total Sell) -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow flex items-center justify-between">
+        <div>
+          <p class="text-xs uppercase font-semibold text-slate-400">Total Buy Value</p>
+          <h3 id="cardTotalBuy" class="text-2xl font-bold text-sky-400 mt-1 font-mono">0.00</h3>
+        </div>
+        <div class="bg-sky-500/20 text-sky-400 p-3 rounded-lg text-xl">🛒</div>
+      </div>
+      <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow flex items-center justify-between">
+        <div>
+          <p class="text-xs uppercase font-semibold text-slate-400">Total Sell Value</p>
+          <h3 id="cardTotalSell" class="text-2xl font-bold text-emerald-400 mt-1 font-mono">0.00</h3>
+        </div>
+        <div class="bg-emerald-500/20 text-emerald-400 p-3 rounded-lg text-xl">💰</div>
+      </div>
+    </div>
+
+    <!-- 3. Filter & Admin Controls Toolbar -->
+    <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 flex flex-wrap items-center justify-between gap-4 shadow-md">
+      
+      <div class="flex items-center gap-3 flex-wrap">
+        <!-- Admin Member Selector Dropdown -->
+        <div id="adminMemberBox" class="hidden flex items-center gap-2">
+          <label class="text-xs text-amber-400 font-semibold">👤 Member:</label>
+          <select id="memberSelect" onchange="fetchDataForMember()" class="bg-slate-950 border border-slate-700 rounded-md p-1.5 text-xs text-white outline-none">
+            <option value="all">-- All Members --</option>
+          </select>
+        </div>
+
+        <!-- Calendar Filter -->
+        <span class="text-sm font-medium text-slate-300">📅 Calendar:</span>
+        <div>
+          <input type="date" id="filterStartDate" min="2020-01-01" max="2035-12-31" onchange="renderTable()" class="bg-slate-950 border border-slate-700 rounded-md p-1.5 text-xs text-white">
+        </div>
+        <span class="text-xs text-slate-400">se</span>
+        <div>
+          <input type="date" id="filterEndDate" min="2020-01-01" max="2035-12-31" onchange="renderTable()" class="bg-slate-950 border border-slate-700 rounded-md p-1.5 text-xs text-white">
+        </div>
+        <button onclick="clearDateFilter()" class="text-xs text-slate-400 hover:text-white underline ml-1">Clear</button>
+      </div>
+
+      <!-- Export Buttons -->
+      <div class="flex items-center gap-2">
+        <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded-lg font-semibold flex items-center gap-1.5 transition shadow">
+          📊 Download Excel
+        </button>
+        <button onclick="exportToPDF()" class="bg-rose-600 hover:bg-rose-700 text-white text-xs px-3 py-2 rounded-lg font-semibold flex items-center gap-1.5 transition shadow">
+          📄 Download PDF
+        </button>
+      </div>
+    </div>
+
+    <!-- 4. History Table Card -->
+    <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden shadow-md">
+      <div class="p-4 border-b border-slate-700 flex justify-between items-center">
+        <h3 class="font-semibold text-slate-200">Daily Entry Record</h3>
+        <span id="recordCount" class="text-xs text-slate-400"></span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse text-sm">
+          <thead class="bg-slate-950 text-slate-400 uppercase text-xs">
+            <tr>
+              <th class="p-3" id="memberColHeader" style="display: none;">Member</th>
+              <th class="p-3">Date</th>
+              <th class="p-3">Day</th>
+              <th class="p-3 text-right">BuyVal</th>
+              <th class="p-3 text-right">SellVal</th>
+              <th class="p-3 text-right">Total Value</th>
+              <th class="p-3 text-center">Action</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody" class="divide-y divide-slate-700 font-mono">
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 5. Edit Modal Popup -->
+  <div id="editModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-md shadow-2xl space-y-4">
+      <h3 class="text-lg font-bold text-amber-400">Edit Trade Entry</h3>
+      <form id="editForm" onsubmit="submitEdit(event)" class="space-y-3">
+        <input type="hidden" id="editEntryId">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Date</label>
+          <input type="date" id="editDate" required min="2020-01-01" max="2035-12-31" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white outline-none focus:border-amber-500">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">BuyVal</label>
+          <input type="number" step="0.01" id="editBuyVal" required class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white outline-none focus:border-amber-500">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">SellVal</label>
+          <input type="number" step="0.01" id="editSellVal" required class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white outline-none focus:border-amber-500">
+        </div>
+        <div class="flex gap-2 pt-2">
+          <button type="button" onclick="closeEditModal()" class="w-1/2 bg-slate-700 hover:bg-slate-600 py-2 rounded-lg text-sm font-semibold transition">Cancel</button>
+          <button type="submit" class="w-1/2 bg-amber-500 hover:bg-amber-600 text-slate-950 py-2 rounded-lg text-sm font-bold transition">Update Data</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    let allEntries = [];
+    let currentUser = null;
+
+    function updateDayDisplay() {
+      const val = document.getElementById('entryDate').value;
+      if (!val) return;
+      const d = new Date(val + 'T00:00:00');
+      const dayName = d.toLocaleDateString('en-US', { weekday: 'long' });
+      document.getElementById('dayDisplay').value = dayName;
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('entryDate').value = today;
+    updateDayDisplay();
+
+    function validateDateInput(inputElem) {
+      inputElem.addEventListener('blur', () => {
+        if (!inputElem.value) return;
+        const [year] = inputElem.value.split('-');
+        if (year.length > 4 || parseInt(year, 10) < 2000 || parseInt(year, 10) > 2099) {
+          alert('Kripya valid 4-digit year select karein (e.g. 2026)');
+          inputElem.value = today;
+          if (inputElem.id === 'entryDate') updateDayDisplay();
+          if (inputElem.id.startsWith('filter')) renderTable();
+        }
+      });
+    }
+
+    validateDateInput(document.getElementById('entryDate'));
+    validateDateInput(document.getElementById('filterStartDate'));
+    validateDateInput(document.getElementById('filterEndDate'));
+
+    async function loadData() {
+      const res = await fetch('/api/entries', { credentials: 'include' });
+      if (res.status === 401) {
+        window.location.href = '/index.html';
+        return;
+      }
+      const data = await res.json();
+      currentUser = data.user;
+      allEntries = data.entries;
+
+      document.getElementById('userName').innerText = 'User: ' + currentUser.name;
+      
+      const badge = document.getElementById('roleBadge');
+      badge.classList.remove('hidden');
+      if (currentUser.role === 'admin') {
+        badge.innerText = 'ADMIN';
+        badge.classList.add('bg-amber-500/20', 'text-amber-400', 'border', 'border-amber-500/30');
+        document.getElementById('adminMemberBox').classList.remove('hidden');
+        document.getElementById('memberColHeader').style.display = 'table-cell';
+        loadMemberList();
+      } else {
+        badge.innerText = 'MEMBER';
+        badge.classList.add('bg-emerald-500/20', 'text-emerald-400');
+      }
+
+      renderTable();
+    }
+
+    async function loadMemberList() {
+      const res = await fetch('/api/members', { credentials: 'include' });
+      if (res.ok) {
+        const { members } = await res.json();
+        const select = document.getElementById('memberSelect');
+        select.innerHTML = '<option value="all">-- All Members --</option>';
+        members.forEach(m => {
+          select.innerHTML += `<option value="${m.id}">${m.name} (${m.role})</option>`;
+        });
+      }
+    }
+
+    async function fetchDataForMember() {
+      const memberId = document.getElementById('memberSelect').value;
+      const res = await fetch(`/api/entries?member_id=${memberId}`, { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        allEntries = data.entries;
+        renderTable();
+      }
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('tableBody');
+      const start = document.getElementById('filterStartDate').value;
+      const end = document.getElementById('filterEndDate').value;
+
+      const filtered = allEntries.filter(row => {
+        if (start && row.entry_date < start) return false;
+        if (end && row.entry_date > end) return false;
+        return true;
+      });
+
+      let sumBuy = 0;
+      let sumSell = 0;
+      filtered.forEach(r => {
+        sumBuy += Number(r.buy_val) || 0;
+        sumSell += Number(r.sell_val) || 0;
+      });
+
+      document.getElementById('cardTotalBuy').innerText = sumBuy.toFixed(2);
+      document.getElementById('cardTotalSell').innerText = sumSell.toFixed(2);
+      document.getElementById('recordCount').innerText = `Total: ${filtered.length} entries`;
+
+      tbody.innerHTML = '';
+      if (filtered.length === 0) {
+        const colSpan = currentUser && currentUser.role === 'admin' ? 7 : 6;
+        tbody.innerHTML = `<tr><td colspan="${colSpan}" class="p-4 text-center text-slate-500">Koi record nahi mila.</td></tr>`;
+        return;
+      }
+
+      filtered.forEach(row => {
+        const memberCell = (currentUser && currentUser.role === 'admin') 
+          ? `<td class="p-3 text-slate-300 font-sans text-xs">${row.user_name || '-'}</td>` 
+          : '';
+
+        const totalColor = row.total_val >= 0 ? 'text-emerald-400' : 'text-rose-400';
+        tbody.innerHTML += `
+          <tr class="hover:bg-slate-700/50">
+            ${memberCell}
+            <td class="p-3">${row.entry_date}</td>
+            <td class="p-3 font-sans font-medium text-amber-300 text-xs">${row.day_name || '-'}</td>
+            <td class="p-3 text-right text-slate-300">${Number(row.buy_val).toFixed(2)}</td>
+            <td class="p-3 text-right text-slate-300">${Number(row.sell_val).toFixed(2)}</td>
+            <td class="p-3 text-right font-bold ${totalColor}">${Number(row.total_val).toFixed(2)}</td>
+            <td class="p-3 text-center space-x-1">
+              <button onclick="openEditModal(${row.id})" class="text-xs bg-amber-500/20 text-amber-400 hover:bg-amber-500 hover:text-slate-900 px-2 py-1 rounded transition font-medium">
+                Edit
+              </button>
+              <button onclick="deleteEntry(${row.id})" class="text-xs bg-rose-500/20 text-rose-400 hover:bg-rose-500 hover:text-white px-2 py-1 rounded transition font-medium">
+                Delete
+              </button>
+            </td>
+          </tr>
+        `;
+      });
+    }
+
+    function clearDateFilter() {
+      document.getElementById('filterStartDate').value = '';
+      document.getElementById('filterEndDate').value = '';
+      renderTable();
+    }
+
+    // Save Entry Function
+    async function saveEntry(e) {
+      e.preventDefault();
+      const body = {
+        entry_date: document.getElementById('entryDate').value,
+        buy_val: document.getElementById('buyVal').value,
+        sell_val: document.getElementById('sellVal').value,
+      };
+
+      const res = await fetch('/api/entries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(body)
+      });
+
+      const resData = await res.json().catch(() => ({}));
+
+      if (res.ok) {
+        document.getElementById('buyVal').value = '';
+        document.getElementById('sellVal').value = '';
+        if (currentUser.role === 'admin' && document.getElementById('memberSelect').value !== 'all') {
+          fetchDataForMember();
+        } else {
+          loadData();
+        }
+      } else {
+        alert('Data save karne me error aaya: ' + (resData.error || 'Server error'));
+      }
+    }
+
+    // Edit Modal Open & Populate
+    function openEditModal(id) {
+      const entry = allEntries.find(e => e.id === id);
+      if (!entry) return;
+
+      document.getElementById('editEntryId').value = entry.id;
+      document.getElementById('editDate').value = entry.entry_date;
+      document.getElementById('editBuyVal').value = entry.buy_val;
+      document.getElementById('editSellVal').value = entry.sell_val;
+
+      document.getElementById('editModal').classList.remove('hidden');
+    }
+
+    function closeEditModal() {
+      document.getElementById('editModal').classList.add('hidden');
+    }
+
+    // Submit Edit
+    async function submitEdit(e) {
+      e.preventDefault();
+      const id = document.getElementById('editEntryId').value;
+      const body = {
+        entry_date: document.getElementById('editDate').value,
+        buy_val: document.getElementById('editBuyVal').value,
+        sell_val: document.getElementById('editSellVal').value
+      };
+
+      const res = await fetch(`/api/entries/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(body)
+      });
+
+      const resData = await res.json().catch(() => ({}));
+      if (res.ok) {
+        closeEditModal();
+        if (currentUser.role === 'admin' && document.getElementById('memberSelect').value !== 'all') {
+          fetchDataForMember();
+        } else {
+          loadData();
+        }
+      } else {
+        alert('Update error: ' + (resData.error || 'Update nahi ho paya!'));
+      }
+    }
+
+    // Delete Entry Function
+    async function deleteEntry(id) {
+      if (!confirm('Kya aap sach me is entry ko delete karna chahte hain?')) return;
+
+      const res = await fetch(`/api/entries/${id}`, { 
+        method: 'DELETE',
+        credentials: 'include'
+      });
+
+      if (res.ok) {
+        if (currentUser.role === 'admin' && document.getElementById('memberSelect').value !== 'all') {
+          fetchDataForMember();
+        } else {
+          loadData();
+        }
+      } else {
+        alert('Delete nahi ho paya!');
+      }
+    }
+
+    function getFilteredData() {
+      const start = document.getElementById('filterStartDate').value;
+      const end = document.getElementById('filterEndDate').value;
+      return allEntries.filter(row => {
+        if (start && row.entry_date < start) return false;
+        if (end && row.entry_date > end) return false;
+        return true;
+      });
+    }
+
+    function exportToExcel() {
+      const data = getFilteredData();
+      if (data.length === 0) {
+        alert('Download karne ke liye koi data nahi hai!');
+        return;
+      }
+
+      const rows = data.map(item => {
+        const rowObj = {};
+        if (currentUser.role === 'admin') rowObj['Member'] = item.user_name;
+        rowObj['Date'] = item.entry_date;
+        rowObj['Day'] = item.day_name;
+        rowObj['Buy Value'] = Number(item.buy_val);
+        rowObj['Sell Value'] = Number(item.sell_val);
+        rowObj['Total Value'] = Number(item.total_val);
+        return rowObj;
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(rows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Trades');
+      XLSX.writeFile(workbook, `Trade_Report_${currentUser.name}.xlsx`);
+    }
+
+    function exportToPDF() {
+      const data = getFilteredData();
+      if (data.length === 0) {
+        alert('Download karne ke liye koi data nahi hai!');
+        return;
+      }
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+
+      doc.setFontSize(16);
+      doc.text(`Trade Statement - ${currentUser.name}`, 14, 15);
+      doc.setFontSize(10);
+      doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 22);
+
+      const headers = currentUser.role === 'admin' 
+        ? ['Member', 'Date', 'Day', 'BuyVal', 'SellVal', 'Total Value']
+        : ['Date', 'Day', 'BuyVal', 'SellVal', 'Total Value'];
+
+      const tableRows = data.map(item => {
+        if (currentUser.role === 'admin') {
+          return [item.user_name, item.entry_date, item.day_name, Number(item.buy_val).toFixed(2), Number(item.sell_val).toFixed(2), Number(item.total_val).toFixed(2)];
+        }
+        return [item.entry_date, item.day_name, Number(item.buy_val).toFixed(2), Number(item.sell_val).toFixed(2), Number(item.total_val).toFixed(2)];
+      });
+
+      doc.autoTable({
+        head: [headers],
+        body: tableRows,
+        startY: 28,
+        theme: 'striped',
+        headStyles: { fillColor: [16, 185, 129] },
+        styles: { fontSize: 9 }
+      });
+
+      doc.save(`Trade_Report_${currentUser.name}.pdf`);
+    }
+
+    async function logout() {
+      await fetch('/api/logout', { method: 'POST', credentials: 'include' });
+      window.location.href = '/index.html';
+    }
+
+    loadData();
+  </script>
+</body>
+</html>
