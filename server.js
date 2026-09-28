@@ -1,50 +1,51 @@
 const express = require('express');
-const Database = require('better-sqlite3');
+const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
 const path = require('path');
 
 const app = express();
-const db = new Database('trade_data.db');
-const JWT_SECRET = 'apna_secret_key_12345';
-
-// OFFICE SECRET PASSCODE (Aap ise apne anusaar change kar sakte hain)
+const JWT_SECRET = process.env.JWT_SECRET || 'apna_secret_key_12345';
 const OFFICE_SECRET_CODE = 'OFFICE@2026';
 
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Database Setup & Auto Migration
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    email TEXT UNIQUE NOT NULL, -- Yeh username/MCX ID store karega
-    password TEXT NOT NULL,
-    role TEXT DEFAULT 'member'
-  );
+// Database Setup
+const db = new sqlite3.Database('trade_data.db', (err) => {
+  if (err) console.error('DB Open Error:', err);
+  else console.log('Connected to SQLite database.');
+});
 
-  CREATE TABLE IF NOT EXISTS trade_entries (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    entry_date TEXT NOT NULL,
-    day_name TEXT DEFAULT '',
-    script_name TEXT DEFAULT '',
-    buy_val REAL NOT NULL DEFAULT 0,
-    sell_val REAL NOT NULL DEFAULT 0,
-    total_val REAL NOT NULL DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id)
-  );
-`);
+db.serialize(() => {
+  db.run(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      password TEXT NOT NULL,
+      role TEXT DEFAULT 'member'
+    )
+  `);
 
-try { db.exec(`ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'member'`); } catch(e){}
-try { db.exec(`ALTER TABLE trade_entries ADD COLUMN day_name TEXT DEFAULT ''`); } catch(e){}
-try { db.exec(`ALTER TABLE trade_entries ADD COLUMN script_name TEXT DEFAULT ''`); } catch(e){}
+  db.run(`
+    CREATE TABLE IF NOT EXISTS trade_entries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      entry_date TEXT NOT NULL,
+      day_name TEXT DEFAULT '',
+      script_name TEXT DEFAULT '',
+      buy_val REAL NOT NULL DEFAULT 0,
+      sell_val REAL NOT NULL DEFAULT 0,
+      total_val REAL NOT NULL DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+});
 
-// Root Route
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -62,49 +63,57 @@ function authMiddleware(req, res, next) {
   }
 }
 
-// 1. Register API (Username / MCX ID Allowed)
-app.post('/api/register', async (req, res) => {
+function getDayNameFromDate(dateStr) {
+  const dateObj = new Date(dateStr + 'T00:00:00');
+  return dateObj.toLocaleDateString('en-US', { weekday: 'long' });
+}
+
+// 1. Register API
+app.post('/api/register', (req, res) => {
   const { name, email, password, office_code } = req.body;
-  
   if (!name || !email || !password || !office_code) {
     return res.status(400).json({ error: 'Sabhi fields aur Office Code bharna zaroori hai' });
   }
 
-  // Office Passcode Check
   if (office_code.trim() !== OFFICE_SECRET_CODE) {
-    return res.status(403).json({ error: 'Galat Office Passcode! Bahar ke users register nahi kar sakte.' });
+    return res.status(403).json({ error: 'Galat Office Passcode!' });
   }
 
-  try {
-    const totalUsers = db.prepare('SELECT COUNT(*) as count FROM users').get().count;
-    const role = totalUsers === 0 ? 'admin' : 'member';
-
+  db.get('SELECT COUNT(*) as count FROM users', async (err, row) => {
+    if (err) return res.status(500).json({ error: 'DB Error' });
+    const role = row.count === 0 ? 'admin' : 'member';
     const cleanUsername = email.trim().toLowerCase();
     const hashedPassword = await bcrypt.hash(password, 10);
-    const stmt = db.prepare('INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)');
-    stmt.run(name.trim(), cleanUsername, hashedPassword, role);
-    res.json({ message: `Registration safal raha! (${role.toUpperCase()} Account). Ab login karein.` });
-  } catch (err) {
-    res.status(400).json({ error: 'Yeh User ID / MCX ID pehle se registered hai.' });
-  }
+
+    db.run(
+      'INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)',
+      [name.trim(), cleanUsername, hashedPassword, role],
+      function (insertErr) {
+        if (insertErr) {
+          return res.status(400).json({ error: 'Yeh User ID / MCX ID pehle se registered hai.' });
+        }
+        res.json({ message: `Registration safal raha! (${role.toUpperCase()} Account). Ab login karein.` });
+      }
+    );
+  });
 });
 
-// 2. Login API (Case-insensitive check for MCX ID)
-app.post('/api/login', async (req, res) => {
+// 2. Login API
+app.post('/api/login', (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: 'User ID aur Password dono dalein' });
   }
 
   const cleanUsername = email.trim().toLowerCase();
-  const user = db.prepare('SELECT * FROM users WHERE LOWER(email) = ?').get(cleanUsername);
-  
-  if (!user || !(await bcrypt.compare(password, user.password))) {
-    return res.status(400).json({ error: 'Galat User ID ya Password' });
-  }
-  const token = jwt.sign({ id: user.id, name: user.name, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-  res.cookie('token', token, { httpOnly: true, sameSite: 'lax' });
-  res.json({ message: 'Login successful', name: user.name, role: user.role });
+  db.get('SELECT * FROM users WHERE LOWER(email) = ?', [cleanUsername], async (err, user) => {
+    if (err || !user || !(await bcrypt.compare(password, user.password))) {
+      return res.status(400).json({ error: 'Galat User ID ya Password' });
+    }
+    const token = jwt.sign({ id: user.id, name: user.name, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+    res.cookie('token', token, { httpOnly: true, sameSite: 'lax' });
+    res.json({ message: 'Login successful', name: user.name, role: user.role });
+  });
 });
 
 // 3. Logout API
@@ -113,134 +122,107 @@ app.post('/api/logout', (req, res) => {
   res.json({ message: 'Logged out' });
 });
 
-function getDayNameFromDate(dateStr) {
-  const dateObj = new Date(dateStr + 'T00:00:00');
-  return dateObj.toLocaleDateString('en-US', { weekday: 'long' });
-}
-
-// 4. Save Entry API (Buy + Sell Combine)
+// 4. Save Entry API
 app.post('/api/entries', authMiddleware, (req, res) => {
-  try {
-    const { entry_date, buy_val, sell_val } = req.body;
-    if (!entry_date) return res.status(400).json({ error: 'Date zaroori hai' });
+  const { entry_date, buy_val, sell_val } = req.body;
+  if (!entry_date) return res.status(400).json({ error: 'Date zaroori hai' });
 
-    const buy = parseFloat(buy_val) || 0;
-    const sell = parseFloat(sell_val) || 0;
-    const total = buy + sell;
-    const dayName = getDayNameFromDate(entry_date);
+  const buy = parseFloat(buy_val) || 0;
+  const sell = parseFloat(sell_val) || 0;
+  const total = buy + sell;
+  const dayName = getDayNameFromDate(entry_date);
 
-    const stmt = db.prepare(`
-      INSERT INTO trade_entries (user_id, entry_date, day_name, script_name, buy_val, sell_val, total_val)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-    stmt.run(req.user.id, entry_date, dayName, dayName, buy, sell, total);
-    res.json({ success: true, message: 'Data successfully save ho gaya!' });
-  } catch (err) {
-    console.error('Error saving entry:', err);
-    res.status(500).json({ error: 'Database save error: ' + err.message });
-  }
+  db.run(
+    `INSERT INTO trade_entries (user_id, entry_date, day_name, script_name, buy_val, sell_val, total_val)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [req.user.id, entry_date, dayName, dayName, buy, sell, total],
+    function (err) {
+      if (err) return res.status(500).json({ error: 'Save error: ' + err.message });
+      res.json({ success: true, message: 'Data successfully save ho gaya!' });
+    }
+  );
 });
 
-// 5. Update (Edit) Trade Entry API (Buy + Sell Combine)
+// 5. Update Entry API
 app.put('/api/entries/:id', authMiddleware, (req, res) => {
-  try {
-    const entryId = parseInt(req.params.id, 10);
-    const { entry_date, buy_val, sell_val } = req.body;
+  const entryId = parseInt(req.params.id, 10);
+  const { entry_date, buy_val, sell_val } = req.body;
 
-    const buy = parseFloat(buy_val) || 0;
-    const sell = parseFloat(sell_val) || 0;
-    const total = buy + sell;
-    const dayName = getDayNameFromDate(entry_date);
+  const buy = parseFloat(buy_val) || 0;
+  const sell = parseFloat(sell_val) || 0;
+  const total = buy + sell;
+  const dayName = getDayNameFromDate(entry_date);
 
-    let stmt;
-    if (req.user.role === 'admin') {
-      stmt = db.prepare(`
-        UPDATE trade_entries 
-        SET entry_date = ?, day_name = ?, buy_val = ?, sell_val = ?, total_val = ?
-        WHERE id = ?
-      `);
-      stmt.run(entry_date, dayName, buy, sell, total, entryId);
-    } else {
-      stmt = db.prepare(`
-        UPDATE trade_entries 
-        SET entry_date = ?, day_name = ?, buy_val = ?, sell_val = ?, total_val = ?
-        WHERE id = ? AND user_id = ?
-      `);
-      stmt.run(entry_date, dayName, buy, sell, total, entryId, req.user.id);
-    }
+  const query = req.user.role === 'admin'
+    ? `UPDATE trade_entries SET entry_date = ?, day_name = ?, buy_val = ?, sell_val = ?, total_val = ? WHERE id = ?`
+    : `UPDATE trade_entries SET entry_date = ?, day_name = ?, buy_val = ?, sell_val = ?, total_val = ? WHERE id = ? AND user_id = ?`;
 
+  const params = req.user.role === 'admin'
+    ? [entry_date, dayName, buy, sell, total, entryId]
+    : [entry_date, dayName, buy, sell, total, entryId, req.user.id];
+
+  db.run(query, params, function (err) {
+    if (err) return res.status(500).json({ error: 'Update error: ' + err.message });
     res.json({ success: true, message: 'Entry successfully update ho gayi!' });
-  } catch (err) {
-    console.error('Error updating entry:', err);
-    res.status(500).json({ error: 'Update error: ' + err.message });
-  }
+  });
 });
 
 // 6. Get Entries API
 app.get('/api/entries', authMiddleware, (req, res) => {
-  let targetUserId = req.user.id;
-
-  if (req.user.role === 'admin' && req.query.member_id) {
-    if (req.query.member_id === 'all') {
-      const stmt = db.prepare(`
-        SELECT trade_entries.*, users.name as user_name 
-        FROM trade_entries 
-        JOIN users ON trade_entries.user_id = users.id 
-        ORDER BY entry_date DESC, trade_entries.id DESC
-      `);
-      const entries = stmt.all();
-      return res.json({ user: req.user, entries });
-    } else {
-      targetUserId = parseInt(req.query.member_id, 10);
-    }
-  }
-
-  const stmt = db.prepare(`
+  let query = `
     SELECT trade_entries.*, users.name as user_name 
     FROM trade_entries 
     JOIN users ON trade_entries.user_id = users.id 
     WHERE user_id = ? 
     ORDER BY entry_date DESC, trade_entries.id DESC
-  `);
-  const entries = stmt.all(targetUserId);
-  res.json({ user: req.user, entries });
-});
+  `;
+  let params = [req.user.id];
 
-// 7. Get All Members List (Sirf Admin)
-app.get('/api/members', authMiddleware, (req, res) => {
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Access denied' });
+  if (req.user.role === 'admin' && req.query.member_id) {
+    if (req.query.member_id === 'all') {
+      query = `
+        SELECT trade_entries.*, users.name as user_name 
+        FROM trade_entries 
+        JOIN users ON trade_entries.user_id = users.id 
+        ORDER BY entry_date DESC, trade_entries.id DESC
+      `;
+      params = [];
+    } else {
+      params = [parseInt(req.query.member_id, 10)];
+    }
   }
-  const members = db.prepare('SELECT id, name, email as username, role FROM users ORDER BY name ASC').all();
-  res.json({ members });
+
+  db.all(query, params, (err, entries) => {
+    if (err) return res.status(500).json({ error: 'Fetch error' });
+    res.json({ user: req.user, entries });
+  });
 });
 
-// 8. Delete Trade Entry API
+// 7. Get Members List
+app.get('/api/members', authMiddleware, (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Access denied' });
+  db.all('SELECT id, name, email as username, role FROM users ORDER BY name ASC', [], (err, members) => {
+    if (err) return res.status(500).json({ error: 'Fetch error' });
+    res.json({ members });
+  });
+});
+
+// 8. Delete Entry API
 app.delete('/api/entries/:id', authMiddleware, (req, res) => {
   const entryId = parseInt(req.params.id, 10);
-  if (isNaN(entryId)) return res.status(400).json({ error: 'Invalid ID' });
+  const query = req.user.role === 'admin'
+    ? 'DELETE FROM trade_entries WHERE id = ?'
+    : 'DELETE FROM trade_entries WHERE id = ? AND user_id = ?';
+  const params = req.user.role === 'admin' ? [entryId] : [entryId, req.user.id];
 
-  let stmt;
-  if (req.user.role === 'admin') {
-    stmt = db.prepare('DELETE FROM trade_entries WHERE id = ?');
-    stmt.run(entryId);
-  } else {
-    stmt = db.prepare('DELETE FROM trade_entries WHERE id = ? AND user_id = ?');
-    stmt.run(entryId, req.user.id);
-  }
-
-  res.json({ success: true, message: 'Entry delete ho gayi!' });
-});
-
-// --- HEROKU PORT & LISTEN BINDING ---
-const PORT = process.env.PORT || 3000;
-
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server started successfully on port ${PORT}`);
-});
-
-process.on('SIGTERM', () => {
-  server.close(() => {
-    console.log('Process terminated');
+  db.run(query, params, function (err) {
+    if (err) return res.status(500).json({ error: 'Delete error' });
+    res.json({ success: true, message: 'Entry delete ho gayi!' });
   });
+});
+
+// Server Listen (Heroku Dyno Binding)
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server started successfully on port ${PORT}`);
 });
