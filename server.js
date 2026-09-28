@@ -254,8 +254,25 @@ app.delete('/api/entries/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// Always Listen First (Heroku Binding)
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Application started and listening on port ${PORT}`);
+// Error catchers
+process.on('uncaughtException', (err) => {
+  console.error('CRITICAL UNCAUGHT EXCEPTION:', err);
 });
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('CRITICAL UNHANDLED REJECTION:', reason);
+});
+
+// Port & Listen
+const PORT = process.env.PORT || 3000;
+
+const server = app.listen(PORT, '0.0.0.0', () => {
+  console.log(`=================================`);
+  console.log(`SERVER RUNNING ON PORT: ${PORT}`);
+  console.log(`=================================`);
+});
+
+// Event loop ko active rakhne ke liye infinite interval
+setInterval(() => {
+  // Keeps the event loop busy
+}, 10000);
