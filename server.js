@@ -6,7 +6,7 @@ const cookieParser = require('cookie-parser');
 const path = require('path');
 
 const app = express();
-const JWT_SECRET = process.env.JWT_SECRET || 'apna_secret_key_12345';
+const JWT_SECRET = process.env.JWT_SECRET || 'trade_portal_secret_key_2026';
 const OFFICE_SECRET_CODE = 'OFFICE@2026';
 
 app.use(express.json());
@@ -14,19 +14,22 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Heroku Postgres Connection Config
-// (Agar local test karna ho to yahan apna Heroku postgres URL paste kar sakte hain)
-const FALLBACK_DB_URL = 'postgres://ucm8tmsvih2ol7:pf361b642d6f57e4eb6831650c9756630f9c82d7e5fbebd552e7308a719f3e5f8@cemv7jmv0b38gs.cluster-czrs8kj4isg7.us-east-1.rds.amazonaws.com:5432/d5sqh1meoa49i3';
-const dbUrl = process.env.DATABASE_URL || FALLBACK_DB_URL;
-
 const pool = new Pool({
-  connectionString: dbUrl,
-  ssl: dbUrl.includes('localhost') ? false : { rejectUnauthorized: false }
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
-// Database Auto-Setup (PostgreSQL)
+// Database Auto-Setup
 async function initDB() {
+  if (!process.env.DATABASE_URL) {
+    console.log('WARNING: DATABASE_URL not set. Running in offline mode.');
+    return;
+  }
   try {
-    await pool.query(`
+    const client = await pool.connect();
+    await client.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
@@ -47,9 +50,10 @@ async function initDB() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log('PostgreSQL database connected and tables initialized successfully.');
+    client.release();
+    console.log('PostgreSQL Database tables ready.');
   } catch (err) {
-    console.error('PostgreSQL Database initialization error:', err.message);
+    console.error('Database connection error:', err.message);
   }
 }
 initDB();
@@ -76,7 +80,7 @@ function getDayNameFromDate(dateStr) {
   return dateObj.toLocaleDateString('en-US', { weekday: 'long' });
 }
 
-// 1. Register API (Username / MCX ID + Office Passcode)
+// 1. Register API
 app.post('/api/register', async (req, res) => {
   const { name, email, password, office_code } = req.body;
   if (!name || !email || !password || !office_code) {
@@ -224,7 +228,7 @@ app.get('/api/entries', authMiddleware, async (req, res) => {
   }
 });
 
-// 7. Get Members List (Sirf Admin)
+// 7. Get Members List
 app.get('/api/members', authMiddleware, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Access denied' });
   try {
@@ -250,17 +254,8 @@ app.delete('/api/entries/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// Port & Listen
+// Always Listen First (Heroku Binding)
 const PORT = process.env.PORT || 3000;
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`=================================`);
-  console.log(`SERVER RUNNING ON PORT: ${PORT}`);
-  console.log(`=================================`);
-});
-
-// Keep-alive timer
-setInterval(() => {}, 1000 * 60 * 60);
-
-server.on('error', (err) => {
-  console.error('SERVER LISTEN ERROR:', err);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Application started and listening on port ${PORT}`);
 });
