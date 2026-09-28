@@ -1,9 +1,13 @@
 {
   "name": "trade_portal",
   "version": "1.0.0",
+  "description": "Trade Portal Web Application",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

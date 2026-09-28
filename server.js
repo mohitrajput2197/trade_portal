@@ -13,18 +13,16 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Heroku Postgres Connection Config
+// Heroku Postgres Connection Configuration
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false
-  }
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
 
-// Database Auto-Setup
+// Database Auto-Setup (PostgreSQL)
 async function initDB() {
   if (!process.env.DATABASE_URL) {
-    console.log('WARNING: DATABASE_URL not set. Running in offline mode.');
+    console.log('WARNING: DATABASE_URL not set. Running in offline/local fallback mode.');
     return;
   }
   try {
@@ -51,13 +49,14 @@ async function initDB() {
       );
     `);
     client.release();
-    console.log('PostgreSQL Database tables ready.');
+    console.log('PostgreSQL database connected and tables verified.');
   } catch (err) {
-    console.error('Database connection error:', err.message);
+    console.error('Database initialization error:', err.message);
   }
 }
 initDB();
 
+// Root Route
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -80,7 +79,7 @@ function getDayNameFromDate(dateStr) {
   return dateObj.toLocaleDateString('en-US', { weekday: 'long' });
 }
 
-// 1. Register API
+// 1. Register API (MCX ID Login + Office Passcode)
 app.post('/api/register', async (req, res) => {
   const { name, email, password, office_code } = req.body;
   if (!name || !email || !password || !office_code) {
@@ -228,7 +227,7 @@ app.get('/api/entries', authMiddleware, async (req, res) => {
   }
 });
 
-// 7. Get Members List
+// 7. Get Members List (Admin Only)
 app.get('/api/members', authMiddleware, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Access denied' });
   try {
@@ -254,25 +253,25 @@ app.delete('/api/entries/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// Error catchers
+// Crash prevention handlers
 process.on('uncaughtException', (err) => {
   console.error('CRITICAL UNCAUGHT EXCEPTION:', err);
 });
-
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', (reason) => {
   console.error('CRITICAL UNHANDLED REJECTION:', reason);
 });
 
-// Port & Listen
+// Dyno Listen Binding
 const PORT = process.env.PORT || 3000;
-
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`=================================`);
   console.log(`SERVER RUNNING ON PORT: ${PORT}`);
   console.log(`=================================`);
 });
 
-// Event loop ko active rakhne ke liye infinite interval
-setInterval(() => {
-  // Keeps the event loop busy
-}, 10000);
+// Event loop keep-alive (Heroku status 0 exit preventer)
+setInterval(() => {}, 1000 * 60 * 60);
+
+server.on('error', (err) => {
+  console.error('SERVER LISTEN ERROR:', err);
+});
