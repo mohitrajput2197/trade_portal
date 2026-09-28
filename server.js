@@ -13,13 +13,17 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Heroku Postgres Connection Pool
+// Heroku Postgres Connection Config
+// (Agar local test karna ho to yahan apna Heroku postgres URL paste kar sakte hain)
+const FALLBACK_DB_URL = 'postgres://ucm8tmsvih2ol7:pf361b642d6f57e4eb6831650c9756630f9c82d7e5fbebd552e7308a719f3e5f8@cemv7jmv0b38gs.cluster-czrs8kj4isg7.us-east-1.rds.amazonaws.com:5432/d5sqh1meoa49i3';
+const dbUrl = process.env.DATABASE_URL || FALLBACK_DB_URL;
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
+  connectionString: dbUrl,
+  ssl: dbUrl.includes('localhost') ? false : { rejectUnauthorized: false }
 });
 
-// Database Auto-Setup (PostgreSQL Queries)
+// Database Auto-Setup (PostgreSQL)
 async function initDB() {
   try {
     await pool.query(`
@@ -43,9 +47,9 @@ async function initDB() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log('PostgreSQL database connected and initialized.');
+    console.log('PostgreSQL database connected and tables initialized successfully.');
   } catch (err) {
-    console.error('Database connection error:', err);
+    console.error('PostgreSQL Database initialization error:', err.message);
   }
 }
 initDB();
@@ -72,7 +76,7 @@ function getDayNameFromDate(dateStr) {
   return dateObj.toLocaleDateString('en-US', { weekday: 'long' });
 }
 
-// 1. Register API
+// 1. Register API (Username / MCX ID + Office Passcode)
 app.post('/api/register', async (req, res) => {
   const { name, email, password, office_code } = req.body;
   if (!name || !email || !password || !office_code) {
@@ -131,7 +135,7 @@ app.post('/api/logout', (req, res) => {
   res.json({ message: 'Logged out' });
 });
 
-// 4. Save Entry API
+// 4. Save Entry API (Buy + Sell Combine)
 app.post('/api/entries', authMiddleware, async (req, res) => {
   try {
     const { entry_date, buy_val, sell_val } = req.body;
@@ -220,7 +224,7 @@ app.get('/api/entries', authMiddleware, async (req, res) => {
   }
 });
 
-// 7. Get Members List
+// 7. Get Members List (Sirf Admin)
 app.get('/api/members', authMiddleware, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Access denied' });
   try {
@@ -248,6 +252,15 @@ app.delete('/api/entries/:id', authMiddleware, async (req, res) => {
 
 // Port & Listen
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server started successfully on port ${PORT}`);
+const server = app.listen(PORT, '0.0.0.0', () => {
+  console.log(`=================================`);
+  console.log(`SERVER RUNNING ON PORT: ${PORT}`);
+  console.log(`=================================`);
+});
+
+// Keep-alive timer
+setInterval(() => {}, 1000 * 60 * 60);
+
+server.on('error', (err) => {
+  console.error('SERVER LISTEN ERROR:', err);
 });
