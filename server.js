@@ -9,14 +9,14 @@ const app = express();
 const db = new Database('trade_data.db');
 const JWT_SECRET = 'apna_secret_key_12345';
 
-// OFFICE SECRET PASSCODE (Aap ise badal bhi sakte hain)
+// OFFICE SECRET PASSCODE (Aap ise apne anusaar change kar sakte hain)
 const OFFICE_SECRET_CODE = 'OFFICE@2026';
 
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Database Setup
+// Database Setup & Auto Migration
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -44,6 +44,7 @@ try { db.exec(`ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'member'`); } catc
 try { db.exec(`ALTER TABLE trade_entries ADD COLUMN day_name TEXT DEFAULT ''`); } catch(e){}
 try { db.exec(`ALTER TABLE trade_entries ADD COLUMN script_name TEXT DEFAULT ''`); } catch(e){}
 
+// Root Route
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -88,7 +89,7 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// 2. Login API (Case-insensitive match for User/MCX ID)
+// 2. Login API (Case-insensitive check for MCX ID)
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
@@ -140,7 +141,7 @@ app.post('/api/entries', authMiddleware, (req, res) => {
   }
 });
 
-// 5. Update (Edit) Trade Entry API
+// 5. Update (Edit) Trade Entry API (Buy + Sell Combine)
 app.put('/api/entries/:id', authMiddleware, (req, res) => {
   try {
     const entryId = parseInt(req.params.id, 10);
@@ -205,7 +206,7 @@ app.get('/api/entries', authMiddleware, (req, res) => {
   res.json({ user: req.user, entries });
 });
 
-// 7. Get All Members List (Admin Only)
+// 7. Get All Members List (Sirf Admin)
 app.get('/api/members', authMiddleware, (req, res) => {
   if (req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Access denied' });
@@ -231,7 +232,15 @@ app.delete('/api/entries/:id', authMiddleware, (req, res) => {
   res.json({ success: true, message: 'Entry delete ho gayi!' });
 });
 
+// --- HEROKU PORT & LISTEN BINDING ---
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+
+const server = app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server started successfully on port ${PORT}`);
+});
+
+process.on('SIGTERM', () => {
+  server.close(() => {
+    console.log('Process terminated');
+  });
 });
