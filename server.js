@@ -13,16 +13,22 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Heroku Postgres Connection Configuration
+// ==========================================
+// 1. DATABASE CONFIGURATION (HEROKU POSTGRES)
+// ==========================================
+// Agar locally test karna ho to quotes ke andar apna Heroku Postgres URL paste karein:
+const herokuPostgresUrl = 'postgres://ucm8tmsvih2ol7:pf361b642d6f57e4eb6831650c9756630f9c82d7e5fbebd552e7308a719f3e5f8@cemv7jmv0b38gs.cluster-czrs8kj4isg7.us-east-1.rds.amazonaws.com:5432/d5sqh1meoa49i3';
+const dbConnectionString = process.env.DATABASE_URL || herokuPostgresUrl;
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
+  connectionString: dbConnectionString,
+  ssl: dbConnectionString.includes('localhost') ? false : { rejectUnauthorized: false }
 });
 
-// Database Auto-Setup (PostgreSQL)
+// Database Auto-Setup (PostgreSQL Tables)
 async function initDB() {
-  if (!process.env.DATABASE_URL) {
-    console.log('WARNING: DATABASE_URL not set. Running in offline/local fallback mode.');
+  if (!dbConnectionString || dbConnectionString.includes('YAHAN_WO_COPY_KIYA_POSTGRES_URL_PASTE_KAREIN')) {
+    console.log('WARNING: DATABASE_URL set nahi hai. Heroku Settings se URL add karein.');
     return;
   }
   try {
@@ -49,9 +55,9 @@ async function initDB() {
       );
     `);
     client.release();
-    console.log('PostgreSQL database connected and tables verified.');
+    console.log('PostgreSQL database connected and tables initialized successfully.');
   } catch (err) {
-    console.error('Database initialization error:', err.message);
+    console.error('PostgreSQL Database connection/init error:', err.message);
   }
 }
 initDB();
@@ -79,7 +85,11 @@ function getDayNameFromDate(dateStr) {
   return dateObj.toLocaleDateString('en-US', { weekday: 'long' });
 }
 
-// 1. Register API (MCX ID Login + Office Passcode)
+// ==========================================
+// 2. AUTHENTICATION APIS
+// ==========================================
+
+// Register API (MCX ID / Username + Office Passcode)
 app.post('/api/register', async (req, res) => {
   const { name, email, password, office_code } = req.body;
   if (!name || !email || !password || !office_code) {
@@ -108,7 +118,7 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// 2. Login API
+// Login API
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
@@ -132,13 +142,17 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// 3. Logout API
+// Logout API
 app.post('/api/logout', (req, res) => {
   res.clearCookie('token');
   res.json({ message: 'Logged out' });
 });
 
-// 4. Save Entry API (Buy + Sell Combine)
+// ==========================================
+// 3. TRADE ENTRIES APIS
+// ==========================================
+
+// Save Entry API (Buy + Sell Combine)
 app.post('/api/entries', authMiddleware, async (req, res) => {
   try {
     const { entry_date, buy_val, sell_val } = req.body;
@@ -161,7 +175,7 @@ app.post('/api/entries', authMiddleware, async (req, res) => {
   }
 });
 
-// 5. Update Entry API
+// Update Entry API
 app.put('/api/entries/:id', authMiddleware, async (req, res) => {
   try {
     const entryId = parseInt(req.params.id, 10);
@@ -190,7 +204,7 @@ app.put('/api/entries/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// 6. Get Entries API
+// Get Entries API
 app.get('/api/entries', authMiddleware, async (req, res) => {
   try {
     let result;
@@ -227,7 +241,7 @@ app.get('/api/entries', authMiddleware, async (req, res) => {
   }
 });
 
-// 7. Get Members List (Admin Only)
+// Get Members List (Admin Only)
 app.get('/api/members', authMiddleware, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Access denied' });
   try {
@@ -238,7 +252,7 @@ app.get('/api/members', authMiddleware, async (req, res) => {
   }
 });
 
-// 8. Delete Entry API
+// Delete Entry API
 app.delete('/api/entries/:id', authMiddleware, async (req, res) => {
   try {
     const entryId = parseInt(req.params.id, 10);
@@ -253,7 +267,10 @@ app.delete('/api/entries/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// Crash prevention handlers
+// ==========================================
+// 4. ERROR GUARDS & SERVER START
+// ==========================================
+
 process.on('uncaughtException', (err) => {
   console.error('CRITICAL UNCAUGHT EXCEPTION:', err);
 });
@@ -261,7 +278,6 @@ process.on('unhandledRejection', (reason) => {
   console.error('CRITICAL UNHANDLED REJECTION:', reason);
 });
 
-// Dyno Listen Binding
 const PORT = process.env.PORT || 3000;
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`=================================`);
@@ -269,7 +285,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`=================================`);
 });
 
-// Event loop keep-alive (Heroku status 0 exit preventer)
+// Heroku dyno status 0 exit rokne ke liye keep-alive
 setInterval(() => {}, 1000 * 60 * 60);
 
 server.on('error', (err) => {
