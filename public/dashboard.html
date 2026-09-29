@@ -18,6 +18,10 @@
       <span id="roleBadge" class="hidden text-xs px-2.5 py-0.5 rounded-full font-semibold"></span>
     </div>
     <div class="flex items-center gap-4">
+      <!-- Admin Users Management Button -->
+      <button id="adminManageUsersBtn" onclick="openMemberModal()" class="hidden bg-amber-500/20 hover:bg-amber-500 hover:text-slate-950 text-amber-400 border border-amber-500/40 text-sm px-3 py-1.5 rounded-md font-semibold transition flex items-center gap-1.5">
+        👥 Manage Users
+      </button>
       <span id="userName" class="text-slate-300 font-medium"></span>
       <button onclick="logout()" class="bg-rose-500 hover:bg-rose-600 text-sm px-3 py-1.5 rounded-md font-semibold transition">Logout</button>
     </div>
@@ -157,6 +161,39 @@
     </div>
   </div>
 
+  <!-- 6. Member Management Modal (Admin Only) -->
+  <div id="memberModal" class="hidden fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-50">
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-2xl shadow-2xl space-y-4">
+      <div class="flex justify-between items-center border-b border-slate-700 pb-3">
+        <h3 class="text-lg font-bold text-amber-400 flex items-center gap-2">
+          👥 Registered Members Management
+        </h3>
+        <button onclick="closeMemberModal()" class="text-slate-400 hover:text-white text-xl font-bold">&times;</button>
+      </div>
+
+      <div class="overflow-x-auto max-h-96">
+        <table class="w-full text-left border-collapse text-sm">
+          <thead class="bg-slate-950 text-slate-400 uppercase text-xs sticky top-0">
+            <tr>
+              <th class="p-3">ID</th>
+              <th class="p-3">Name</th>
+              <th class="p-3">Username / MCX ID</th>
+              <th class="p-3">Role</th>
+              <th class="p-3 text-center">Action</th>
+            </tr>
+          </thead>
+          <tbody id="memberListTableBody" class="divide-y divide-slate-700 font-sans">
+            <tr><td colspan="5" class="p-4 text-center text-slate-400">Loading members...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="flex justify-end pt-2 border-t border-slate-700">
+        <button type="button" onclick="closeMemberModal()" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">Close</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let allEntries = [];
     let currentUser = null;
@@ -208,6 +245,7 @@
         badge.innerText = 'ADMIN';
         badge.classList.add('bg-amber-500/20', 'text-amber-400', 'border', 'border-amber-500/30');
         document.getElementById('adminMemberBox').classList.remove('hidden');
+        document.getElementById('adminManageUsersBtn').classList.remove('hidden');
         document.getElementById('memberColHeader').style.display = 'table-cell';
         loadMemberList();
       } else {
@@ -223,10 +261,87 @@
       if (res.ok) {
         const { members } = await res.json();
         const select = document.getElementById('memberSelect');
+        const currentSelected = select.value;
         select.innerHTML = '<option value="all">-- All Members --</option>';
         members.forEach(m => {
           select.innerHTML += `<option value="${m.id}">${m.name} (${m.role})</option>`;
         });
+        if (currentSelected) select.value = currentSelected;
+      }
+    }
+
+    // --- Admin Member Management Modal Functions ---
+    async function openMemberModal() {
+      document.getElementById('memberModal').classList.remove('hidden');
+      await refreshMemberListInModal();
+    }
+
+    function closeMemberModal() {
+      document.getElementById('memberModal').classList.add('hidden');
+    }
+
+    async function refreshMemberListInModal() {
+      const tbody = document.getElementById('memberListTableBody');
+      tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-slate-400">Loading...</td></tr>';
+
+      try {
+        const res = await fetch('/api/members', { credentials: 'include' });
+        if (!res.ok) throw new Error('Failed to load members');
+        const { members } = await res.json();
+
+        tbody.innerHTML = '';
+        if (members.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-slate-400">Koi member nahi mila.</td></tr>';
+          return;
+        }
+
+        members.forEach(m => {
+          const isSelf = currentUser && currentUser.id === m.id;
+          const roleBadge = m.role === 'admin' 
+            ? `<span class="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs px-2 py-0.5 rounded-full font-semibold">ADMIN</span>`
+            : `<span class="bg-slate-700 text-slate-300 text-xs px-2 py-0.5 rounded-full">MEMBER</span>`;
+
+          const actionBtn = isSelf 
+            ? `<span class="text-xs text-slate-500 italic">Current User</span>`
+            : `<button onclick="deleteMember(${m.id}, '${m.name}')" class="text-xs bg-rose-500/20 text-rose-400 hover:bg-rose-500 hover:text-white px-2.5 py-1 rounded transition font-semibold">Delete User</button>`;
+
+          tbody.innerHTML += `
+            <tr class="hover:bg-slate-700/50">
+              <td class="p-3 font-mono text-xs text-slate-400">${m.id}</td>
+              <td class="p-3 font-semibold text-slate-200">${m.name}</td>
+              <td class="p-3 font-mono text-xs text-slate-300">${m.username}</td>
+              <td class="p-3">${roleBadge}</td>
+              <td class="p-3 text-center">${actionBtn}</td>
+            </tr>
+          `;
+        });
+      } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-rose-400">Members load karne me error aaya.</td></tr>';
+      }
+    }
+
+    async function deleteMember(userId, userName) {
+      if (!confirm(`Kya aap sach me user '${userName}' ko delete karna chahte hain? Unka saara trade record bhi delete ho jayega.`)) {
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/members/${userId}`, {
+          method: 'DELETE',
+          credentials: 'include'
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          alert(data.message || 'User successfully delete ho gaya!');
+          await refreshMemberListInModal();
+          await loadMemberList();
+          await loadData();
+        } else {
+          alert('Error: ' + (data.error || 'User delete nahi ho paya.'));
+        }
+      } catch (err) {
+        alert('Server se connect karne me dikkat aayi.');
       }
     }
 
