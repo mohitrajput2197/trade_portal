@@ -10,7 +10,12 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   
+  <!-- Flatpickr Modern Dark Calendar -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <link rel="stylesheet" href="https://npmcdn.com/flatpickr/dist/themes/dark.css">
+
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -43,20 +48,27 @@
       pointer-events: none;
       z-index: 0;
     }
-    input[type="date"]::-webkit-calendar-picker-indicator {
-      filter: invert(0.8);
-      cursor: pointer;
+    .flatpickr-calendar {
+      background: #0f172a !important;
+      border: 1px solid rgba(255, 255, 255, 0.12) !important;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6) !important;
+      border-radius: 14px !important;
+    }
+    .flatpickr-day.selected {
+      background: #10b981 !important;
+      border-color: #10b981 !important;
+      color: #000 !important;
+      font-weight: bold !important;
     }
   </style>
 </head>
 <body class="text-slate-100 min-h-screen relative overflow-x-hidden selection:bg-emerald-500 selection:text-black">
 
-  <!-- Subtle Ambient Glow Orbs -->
   <div class="ambient-glow bg-emerald-500 -top-24 -left-24"></div>
   <div class="ambient-glow bg-sky-500 top-1/2 -right-32"></div>
   <div class="ambient-glow bg-amber-500 -bottom-24 left-1/3"></div>
 
-  <!-- Top Navbar -->
+  <!-- Navbar -->
   <nav class="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800/80 px-6 py-3.5 flex justify-between items-center shadow-xl">
     <div class="flex items-center gap-3">
       <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-slate-950 font-bold text-lg">
@@ -73,16 +85,16 @@
     
     <div class="flex items-center gap-3">
       <!-- Admin Users Management Button -->
-      <button id="adminManageUsersBtn" onclick="openMemberModal()" class="hidden bg-amber-500/10 hover:bg-amber-500 text-amber-400 hover:text-slate-950 border border-amber-500/30 text-xs px-3.5 py-2 rounded-lg font-semibold transition-all duration-200 flex items-center gap-2 shadow-sm">
-        <i class="bi bi-people-fill text-sm"></i> Manage Users
+      <button id="adminManageUsersBtn" onclick="openMemberModal()" class="hidden bg-amber-500/10 hover:bg-amber-500 text-amber-400 hover:text-slate-950 border border-amber-500/30 text-xs px-3.5 py-2 rounded-lg font-semibold transition flex items-center gap-2">
+        <i class="bi bi-shield-lock-fill text-sm"></i> Manage Users & Admins
       </button>
-      
-      <div class="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-lg">
-        <i class="bi bi-person-circle text-emerald-400 text-sm"></i>
-        <span id="userName" class="text-slate-300 font-semibold text-xs"></span>
-      </div>
 
-      <button onclick="logout()" class="bg-rose-500/10 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/30 text-xs px-3.5 py-2 rounded-lg font-semibold transition-all duration-200 flex items-center gap-1.5 shadow-sm">
+      <!-- Profile & Settings Button -->
+      <button onclick="openProfileModal()" class="bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-slate-300 text-xs px-3.5 py-2 rounded-lg font-semibold transition flex items-center gap-2">
+        <i class="bi bi-gear-fill text-emerald-400"></i> <span id="userName">Profile</span>
+      </button>
+
+      <button onclick="logout()" class="bg-rose-500/10 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/30 text-xs px-3.5 py-2 rounded-lg font-semibold transition flex items-center gap-1.5">
         <i class="bi bi-box-arrow-right"></i> Logout
       </button>
     </div>
@@ -91,18 +103,21 @@
   <div class="relative z-10 max-w-6xl mx-auto p-6 space-y-6">
 
     <!-- 1. Daily Entry Form Card -->
-    <div class="glass-panel p-6 rounded-2xl shadow-xl transition-all">
+    <div class="glass-panel p-6 rounded-2xl shadow-xl">
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-sm font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-2">
           <i class="bi bi-plus-circle-fill"></i> New Trade Data Entry
         </h2>
-        <span class="text-xs text-slate-400">Direct Ledger Sync</span>
+        <span class="text-xs text-slate-400">Automated Weekday Sync</span>
       </div>
 
       <form id="entryForm" onsubmit="saveEntry(event)" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 items-end">
         <div>
-          <label class="block text-xs font-semibold text-slate-400 mb-1.5">Trade Date</label>
-          <input type="date" id="entryDate" required min="2020-01-01" max="2035-12-31" onchange="updateDayDisplay()" class="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl p-2.5 text-sm text-white outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition font-mono-val">
+          <label class="block text-xs font-semibold text-slate-400 mb-1.5">Date</label>
+          <div class="relative">
+            <input type="text" id="entryDate" required placeholder="Select Date" class="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl p-2.5 text-sm text-white outline-none focus:border-emerald-500 font-mono-val cursor-pointer">
+            <i class="bi bi-calendar3 absolute right-3.5 top-3 text-emerald-400 pointer-events-none"></i>
+          </div>
         </div>
         <div>
           <label class="block text-xs font-semibold text-slate-400 mb-1.5">Weekday (Auto)</label>
@@ -110,69 +125,65 @@
         </div>
         <div>
           <label class="block text-xs font-semibold text-slate-400 mb-1.5">Buy Value (₹)</label>
-          <input type="number" step="0.01" id="buyVal" required placeholder="0.00" class="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl p-2.5 text-sm text-white outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition font-mono-val">
+          <input type="number" step="0.01" id="buyVal" required placeholder="0.00" class="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl p-2.5 text-sm text-white outline-none focus:border-sky-500 font-mono-val">
         </div>
         <div>
           <label class="block text-xs font-semibold text-slate-400 mb-1.5">Sell Value (₹)</label>
-          <input type="number" step="0.01" id="sellVal" required placeholder="0.00" class="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl p-2.5 text-sm text-white outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition font-mono-val">
+          <input type="number" step="0.01" id="sellVal" required placeholder="0.00" class="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl p-2.5 text-sm text-white outline-none focus:border-emerald-500 font-mono-val">
         </div>
         <div>
-          <button type="submit" class="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold py-2.5 rounded-xl transition duration-200 shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2">
+          <button type="submit" class="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold py-2.5 rounded-xl transition shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2">
             <i class="bi bi-check2-circle text-base"></i> Save Entry
           </button>
         </div>
       </form>
     </div>
 
-    <!-- 2. Summary Cards (Total Buy, Total Sell & Total Combined Value) -->
+    <!-- 2. Summary Cards -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-      <!-- Buy Card -->
-      <div class="glass-panel glass-panel-glow p-5 rounded-2xl shadow-lg transition duration-300 relative overflow-hidden group">
+      <div class="glass-panel glass-panel-glow p-5 rounded-2xl shadow-lg transition relative overflow-hidden group">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-xs uppercase tracking-wider font-bold text-slate-400">Total Buy Value</p>
             <h3 id="cardTotalBuy" class="text-3xl font-extrabold text-sky-400 mt-2 font-mono-val tracking-tight">0.00</h3>
           </div>
-          <div class="w-12 h-12 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center text-xl group-hover:scale-110 transition duration-300">
+          <div class="w-12 h-12 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center text-xl group-hover:scale-110 transition">
             <i class="bi bi-cart-check-fill"></i>
           </div>
         </div>
-        <div class="mt-3 text-[11px] text-slate-500 font-medium">Aggregated across active records</div>
+        <div class="mt-3 text-[11px] text-slate-500 font-medium">Sum of all buy executions</div>
       </div>
 
-      <!-- Sell Card -->
-      <div class="glass-panel glass-panel-glow p-5 rounded-2xl shadow-lg transition duration-300 relative overflow-hidden group">
+      <div class="glass-panel glass-panel-glow p-5 rounded-2xl shadow-lg transition relative overflow-hidden group">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-xs uppercase tracking-wider font-bold text-slate-400">Total Sell Value</p>
             <h3 id="cardTotalSell" class="text-3xl font-extrabold text-emerald-400 mt-2 font-mono-val tracking-tight">0.00</h3>
           </div>
-          <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center text-xl group-hover:scale-110 transition duration-300">
+          <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center text-xl group-hover:scale-110 transition">
             <i class="bi bi-cash-coin"></i>
           </div>
         </div>
-        <div class="mt-3 text-[11px] text-slate-500 font-medium">Aggregated turnover credit</div>
+        <div class="mt-3 text-[11px] text-slate-500 font-medium">Sum of all sell executions</div>
       </div>
 
-      <!-- Combined Total Card -->
-      <div class="glass-panel glass-panel-glow p-5 rounded-2xl shadow-lg transition duration-300 relative overflow-hidden group">
+      <div class="glass-panel glass-panel-glow p-5 rounded-2xl shadow-lg transition relative overflow-hidden group">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-xs uppercase tracking-wider font-bold text-slate-400">Combined Total Volume</p>
             <h3 id="cardTotalVal" class="text-3xl font-extrabold text-amber-400 mt-2 font-mono-val tracking-tight">0.00</h3>
           </div>
-          <div class="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center text-xl group-hover:scale-110 transition duration-300">
+          <div class="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center text-xl group-hover:scale-110 transition">
             <i class="bi bi-bar-chart-line-fill"></i>
           </div>
         </div>
-        <div class="mt-3 text-[11px] text-slate-500 font-medium">Cumulative gross total turnover</div>
+        <div class="mt-3 text-[11px] text-slate-500 font-medium">Gross ledger value</div>
       </div>
     </div>
 
-    <!-- 3. Filter & Admin Controls Toolbar -->
+    <!-- 3. Filter Toolbar -->
     <div class="glass-panel p-4 rounded-2xl flex flex-wrap items-center justify-between gap-4 shadow-lg">
       <div class="flex items-center gap-3 flex-wrap">
-        <!-- Admin Member Selector Dropdown -->
         <div id="adminMemberBox" class="hidden flex items-center gap-2 bg-slate-900/80 px-3 py-1.5 rounded-xl border border-amber-500/30">
           <label class="text-xs text-amber-400 font-bold flex items-center gap-1">
             <i class="bi bi-person-fill"></i> Member:
@@ -182,30 +193,27 @@
           </select>
         </div>
 
-        <!-- Calendar Filter -->
+        <!-- Flatpickr Range Calendar -->
         <div class="flex items-center gap-2 bg-slate-900/60 border border-slate-700/60 px-3 py-1.5 rounded-xl">
           <span class="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-            <i class="bi bi-calendar-event"></i> Range:
+            <i class="bi bi-calendar-range text-emerald-400"></i> Date Filter:
           </span>
-          <input type="date" id="filterStartDate" min="2020-01-01" max="2035-12-31" onchange="renderTable()" class="bg-slate-950 border border-slate-700/60 rounded-lg p-1 text-xs text-white outline-none font-mono-val">
-          <span class="text-xs text-slate-400 font-bold">→</span>
-          <input type="date" id="filterEndDate" min="2020-01-01" max="2035-12-31" onchange="renderTable()" class="bg-slate-950 border border-slate-700/60 rounded-lg p-1 text-xs text-white outline-none font-mono-val">
-          <button onclick="clearDateFilter()" class="text-xs text-slate-400 hover:text-white underline ml-1 font-semibold transition">Reset</button>
+          <input type="text" id="filterDateRange" placeholder="Select Date Range" class="bg-slate-950 border border-slate-700/60 rounded-lg p-1.5 text-xs text-white outline-none font-mono-val w-56 text-center cursor-pointer">
+          <button onclick="clearDateFilter()" class="text-xs text-slate-400 hover:text-white underline ml-1 font-semibold">Reset</button>
         </div>
       </div>
 
-      <!-- Export Buttons -->
       <div class="flex items-center gap-2">
-        <button onclick="exportToExcel()" class="bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-500/30 text-xs px-3.5 py-2 rounded-xl font-semibold flex items-center gap-1.5 transition duration-200 shadow-sm">
+        <button onclick="exportToExcel()" class="bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-500/30 text-xs px-3.5 py-2 rounded-xl font-semibold flex items-center gap-1.5 transition">
           <i class="bi bi-file-earmark-excel-fill"></i> Excel
         </button>
-        <button onclick="exportToPDF()" class="bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/30 text-xs px-3.5 py-2 rounded-xl font-semibold flex items-center gap-1.5 transition duration-200 shadow-sm">
+        <button onclick="exportToPDF()" class="bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/30 text-xs px-3.5 py-2 rounded-xl font-semibold flex items-center gap-1.5 transition">
           <i class="bi bi-file-earmark-pdf-fill"></i> PDF
         </button>
       </div>
     </div>
 
-    <!-- 4. History Table Card -->
+    <!-- 4. Table Card -->
     <div class="glass-panel rounded-2xl overflow-hidden shadow-xl">
       <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950/40">
         <div class="flex items-center gap-2">
@@ -235,8 +243,8 @@
 
   </div>
 
-  <!-- 5. Edit Modal Popup -->
-  <div id="editModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity">
+  <!-- Edit Modal -->
+  <div id="editModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
     <div class="glass-panel border border-slate-700/80 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
       <div class="flex justify-between items-center border-b border-slate-800 pb-3">
         <h3 class="text-base font-bold text-amber-400 flex items-center gap-2">
@@ -249,7 +257,7 @@
         <input type="hidden" id="editEntryId">
         <div>
           <label class="block text-xs font-semibold text-slate-400 mb-1">Date</label>
-          <input type="date" id="editDate" required min="2020-01-01" max="2035-12-31" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white outline-none focus:border-amber-500 font-mono-val">
+          <input type="text" id="editDate" required class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white outline-none focus:border-amber-500 font-mono-val cursor-pointer">
         </div>
         <div>
           <label class="block text-xs font-semibold text-slate-400 mb-1">Buy Value (₹)</label>
@@ -261,18 +269,60 @@
         </div>
         <div class="flex gap-3 pt-2">
           <button type="button" onclick="closeEditModal()" class="w-1/2 bg-slate-800 hover:bg-slate-700 border border-slate-700 py-2.5 rounded-xl text-xs font-semibold transition">Cancel</button>
-          <button type="submit" class="w-1/2 bg-amber-500 hover:bg-amber-400 text-slate-950 py-2.5 rounded-xl text-xs font-bold transition shadow-lg shadow-amber-500/20">Update Entry</button>
+          <button type="submit" class="w-1/2 bg-amber-500 hover:bg-amber-400 text-slate-950 py-2.5 rounded-xl text-xs font-bold transition">Update</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- 6. Member Management Modal (Admin Only) -->
+  <!-- Profile & WhatsApp/Gmail Settings Modal -->
+  <div id="profileModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="glass-panel border border-slate-700/80 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <h3 class="text-base font-bold text-emerald-400 flex items-center gap-2">
+          <i class="bi bi-person-gear"></i> Profile & Data Sync Settings
+        </h3>
+        <button onclick="closeProfileModal()" class="text-slate-400 hover:text-white text-xl font-bold">&times;</button>
+      </div>
+
+      <form id="profileForm" onsubmit="submitProfile(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1 flex items-center gap-1.5">
+            <i class="bi bi-whatsapp text-emerald-400"></i> WhatsApp / Mobile Number
+          </label>
+          <input type="text" id="profilePhone" placeholder="+91 9876543210" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-sm text-white outline-none focus:border-emerald-500 font-mono-val">
+          <p class="text-[10px] text-slate-500 mt-1">Data future me is WhatsApp number par bheja ja sakega.</p>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1 flex items-center gap-1.5">
+            <i class="bi bi-envelope-at text-sky-400"></i> Gmail / Email ID
+          </label>
+          <input type="email" id="profileGmail" placeholder="example@gmail.com" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-sm text-white outline-none focus:border-sky-500 font-mono-val">
+          <p class="text-[10px] text-slate-500 mt-1">Statements aur Trade report is mail par export ki ja sakegi.</p>
+        </div>
+
+        <div class="border-t border-slate-800 pt-3">
+          <label class="block text-xs font-semibold text-amber-400 mb-1 flex items-center gap-1.5">
+            <i class="bi bi-key-fill"></i> Change Password (Optional)
+          </label>
+          <input type="password" id="profileNewPass" placeholder="Leave empty if not changing" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-sm text-white outline-none focus:border-amber-500">
+        </div>
+
+        <div class="flex gap-3 pt-2">
+          <button type="button" onclick="closeProfileModal()" class="w-1/2 bg-slate-800 hover:bg-slate-700 border border-slate-700 py-2.5 rounded-xl text-xs font-semibold transition">Cancel</button>
+          <button type="submit" class="w-1/2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 py-2.5 rounded-xl text-xs font-bold transition">Save Settings</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Admin Users & Role Switcher Modal -->
   <div id="memberModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-    <div class="glass-panel border border-slate-700/80 rounded-2xl p-6 w-full max-w-2xl shadow-2xl space-y-4">
+    <div class="glass-panel border border-slate-700/80 rounded-2xl p-6 w-full max-w-3xl shadow-2xl space-y-4">
       <div class="flex justify-between items-center border-b border-slate-800 pb-3">
         <h3 class="text-base font-bold text-amber-400 flex items-center gap-2">
-          <i class="bi bi-people-fill"></i> Registered Members Management
+          <i class="bi bi-shield-lock-fill"></i> Member & Admin Authorization Control
         </h3>
         <button onclick="closeMemberModal()" class="text-slate-400 hover:text-white text-xl font-bold">&times;</button>
       </div>
@@ -283,13 +333,14 @@
             <tr>
               <th class="p-3">ID</th>
               <th class="p-3">Name</th>
-              <th class="p-3">Username / MCX ID</th>
+              <th class="p-3">MCX ID / Email</th>
+              <th class="p-3">WhatsApp / Mail</th>
               <th class="p-3">Role</th>
-              <th class="p-3 text-center">Action</th>
+              <th class="p-3 text-center">Manage</th>
             </tr>
           </thead>
           <tbody id="memberListTableBody" class="divide-y divide-slate-800/80 font-sans">
-            <tr><td colspan="5" class="p-4 text-center text-slate-400">Loading members...</td></tr>
+            <tr><td colspan="6" class="p-4 text-center text-slate-400">Loading members...</td></tr>
           </tbody>
         </table>
       </div>
@@ -303,35 +354,43 @@
   <script>
     let allEntries = [];
     let currentUser = null;
+    let startDateFilter = '';
+    let endDateFilter = '';
 
-    function updateDayDisplay() {
-      const val = document.getElementById('entryDate').value;
+    // Flatpickr Initialize for Main Entry
+    const entryDatePicker = flatpickr("#entryDate", {
+      dateFormat: "Y-m-d",
+      defaultDate: new Date(),
+      onChange: function(selectedDates, dateStr) {
+        updateDayDisplay(dateStr);
+      }
+    });
+
+    const editDatePicker = flatpickr("#editDate", {
+      dateFormat: "Y-m-d"
+    });
+
+    // Flatpickr Range Calendar
+    flatpickr("#filterDateRange", {
+      mode: "range",
+      dateFormat: "Y-m-d",
+      onChange: function(selectedDates, dateStr) {
+        if (selectedDates.length === 2) {
+          startDateFilter = selectedDates[0].toISOString().split('T')[0];
+          endDateFilter = selectedDates[1].toISOString().split('T')[0];
+          renderTable();
+        }
+      }
+    });
+
+    function updateDayDisplay(val) {
+      if (!val) val = document.getElementById('entryDate').value;
       if (!val) return;
       const d = new Date(val + 'T00:00:00');
-      const dayName = d.toLocaleDateString('en-US', { weekday: 'long' });
-      document.getElementById('dayDisplay').value = dayName;
+      document.getElementById('dayDisplay').value = d.toLocaleDateString('en-US', { weekday: 'long' });
     }
 
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('entryDate').value = today;
-    updateDayDisplay();
-
-    function validateDateInput(inputElem) {
-      inputElem.addEventListener('blur', () => {
-        if (!inputElem.value) return;
-        const [year] = inputElem.value.split('-');
-        if (year.length > 4 || parseInt(year, 10) < 2000 || parseInt(year, 10) > 2099) {
-          alert('Kripya valid 4-digit year select karein (e.g. 2026)');
-          inputElem.value = today;
-          if (inputElem.id === 'entryDate') updateDayDisplay();
-          if (inputElem.id.startsWith('filter')) renderTable();
-        }
-      });
-    }
-
-    validateDateInput(document.getElementById('entryDate'));
-    validateDateInput(document.getElementById('filterStartDate'));
-    validateDateInput(document.getElementById('filterEndDate'));
+    updateDayDisplay(new Date().toISOString().split('T')[0]);
 
     async function loadData() {
       const res = await fetch('/api/entries', { credentials: 'include' });
@@ -376,29 +435,53 @@
       }
     }
 
-    async function openMemberModal() {
+    // Modal Handlers
+    function openMemberModal() {
       document.getElementById('memberModal').classList.remove('hidden');
-      await refreshMemberListInModal();
+      refreshMemberListInModal();
     }
+    function closeMemberModal() { document.getElementById('memberModal').classList.add('hidden'); }
 
-    function closeMemberModal() {
-      document.getElementById('memberModal').classList.add('hidden');
+    function openProfileModal() {
+      document.getElementById('profilePhone').value = currentUser.phone || '';
+      document.getElementById('profileGmail').value = currentUser.gmail || '';
+      document.getElementById('profileNewPass').value = '';
+      document.getElementById('profileModal').classList.remove('hidden');
+    }
+    function closeProfileModal() { document.getElementById('profileModal').classList.add('hidden'); }
+
+    async function submitProfile(e) {
+      e.preventDefault();
+      const phone = document.getElementById('profilePhone').value;
+      const gmail = document.getElementById('profileGmail').value;
+      const new_password = document.getElementById('profileNewPass').value;
+
+      const res = await fetch('/api/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ phone, gmail, new_password })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        alert(data.message);
+        currentUser.phone = phone;
+        currentUser.gmail = gmail;
+        closeProfileModal();
+      } else {
+        alert('Error: ' + data.error);
+      }
     }
 
     async function refreshMemberListInModal() {
       const tbody = document.getElementById('memberListTableBody');
-      tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-slate-400">Loading...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400">Loading...</td></tr>';
 
       try {
         const res = await fetch('/api/members', { credentials: 'include' });
-        if (!res.ok) throw new Error('Failed to load members');
         const { members } = await res.json();
-
         tbody.innerHTML = '';
-        if (members.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-slate-400">Koi member nahi mila.</td></tr>';
-          return;
-        }
 
         members.forEach(m => {
           const isSelf = currentUser && currentUser.id === m.id;
@@ -406,47 +489,66 @@
             ? `<span class="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] px-2 py-0.5 rounded-full font-bold">ADMIN</span>`
             : `<span class="bg-slate-800 text-slate-300 border border-slate-700 text-[11px] px-2 py-0.5 rounded-full font-medium">MEMBER</span>`;
 
-          const actionBtn = isSelf 
-            ? `<span class="text-xs text-slate-500 font-semibold italic">Current Admin</span>`
-            : `<button onclick="deleteMember(${m.id}, '${m.name}')" class="text-xs bg-rose-500/15 text-rose-400 hover:bg-rose-500 hover:text-white border border-rose-500/30 px-3 py-1 rounded-lg transition font-semibold">Delete</button>`;
+          const switchRoleBtn = isSelf ? '' : (
+            m.role === 'admin'
+              ? `<button onclick="changeRole(${m.id}, 'member', '${m.name}')" class="text-xs bg-amber-500/15 text-amber-400 hover:bg-amber-500 hover:text-black border border-amber-500/30 px-2 py-1 rounded-lg transition mr-1 font-semibold">Make Member</button>`
+              : `<button onclick="changeRole(${m.id}, 'admin', '${m.name}')" class="text-xs bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500 hover:text-black border border-emerald-500/30 px-2 py-1 rounded-lg transition mr-1 font-semibold">Make Admin</button>`
+          );
+
+          const deleteBtn = isSelf 
+            ? `<span class="text-xs text-slate-500 italic">Self</span>`
+            : `<button onclick="deleteMember(${m.id}, '${m.name}')" class="text-xs bg-rose-500/15 text-rose-400 hover:bg-rose-500 hover:text-white border border-rose-500/30 px-2 py-1 rounded-lg transition font-semibold">Delete</button>`;
 
           tbody.innerHTML += `
             <tr class="hover:bg-slate-800/40 transition">
               <td class="p-3 font-mono-val text-xs text-slate-400">#${m.id}</td>
               <td class="p-3 font-bold text-slate-200">${m.name}</td>
               <td class="p-3 font-mono-val text-xs text-slate-400">${m.username}</td>
+              <td class="p-3 text-xs text-slate-300">
+                <div><i class="bi bi-whatsapp text-emerald-400"></i> ${m.phone || '-'}</div>
+                <div><i class="bi bi-envelope text-sky-400"></i> ${m.gmail || '-'}</div>
+              </td>
               <td class="p-3">${roleBadge}</td>
-              <td class="p-3 text-center">${actionBtn}</td>
+              <td class="p-3 text-center whitespace-nowrap">${switchRoleBtn} ${deleteBtn}</td>
             </tr>
           `;
         });
       } catch (err) {
-        tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-rose-400">Members load karne me error aaya.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-rose-400">Error loading members.</td></tr>';
+      }
+    }
+
+    async function changeRole(userId, newRole, name) {
+      if (!confirm(`Kya aap '${name}' ko ${newRole.toUpperCase()} banana chahte hain?`)) return;
+
+      const res = await fetch(`/api/members/${userId}/role`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ role: newRole })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(data.message);
+        refreshMemberListInModal();
+        loadMemberList();
+      } else {
+        alert('Error: ' + data.error);
       }
     }
 
     async function deleteMember(userId, userName) {
-      if (!confirm(`Kya aap sach me user '${userName}' ko delete karna chahte hain? Unka saara trade record bhi delete ho jayega.`)) {
-        return;
-      }
+      if (!confirm(`Kya aap sach me user '${userName}' ko delete karna chahte hain?`)) return;
 
-      try {
-        const res = await fetch(`/api/members/${userId}`, {
-          method: 'DELETE',
-          credentials: 'include'
-        });
-
-        const data = await res.json();
-        if (res.ok) {
-          alert(data.message || 'User successfully delete ho gaya!');
-          await refreshMemberListInModal();
-          await loadMemberList();
-          await loadData();
-        } else {
-          alert('Error: ' + (data.error || 'User delete nahi ho paya.'));
-        }
-      } catch (err) {
-        alert('Server se connect karne me dikkat aayi.');
+      const res = await fetch(`/api/members/${userId}`, { method: 'DELETE', credentials: 'include' });
+      const data = await res.json();
+      if (res.ok) {
+        alert(data.message);
+        refreshMemberListInModal();
+        loadMemberList();
+        loadData();
+      } else {
+        alert('Error: ' + data.error);
       }
     }
 
@@ -462,36 +564,23 @@
 
     function renderTable() {
       const tbody = document.getElementById('tableBody');
-      const start = document.getElementById('filterStartDate').value;
-      const end = document.getElementById('filterEndDate').value;
 
       const filtered = allEntries.filter(row => {
-        if (start && row.entry_date < start) return false;
-        if (end && row.entry_date > end) return false;
+        if (startDateFilter && row.entry_date < startDateFilter) return false;
+        if (endDateFilter && row.entry_date > endDateFilter) return false;
         return true;
       });
 
-      let sumBuy = 0;
-      let sumSell = 0;
-      let sumTotal = 0;
-
+      let sumBuy = 0, sumSell = 0, sumTotal = 0;
       filtered.forEach(r => {
         sumBuy += Number(r.buy_val) || 0;
         sumSell += Number(r.sell_val) || 0;
         sumTotal += Number(r.total_val) || 0;
       });
 
-      document.getElementById('cardTotalBuy').innerText = sumBuy.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      document.getElementById('cardTotalSell').innerText = sumSell.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-      const cardTotalValElem = document.getElementById('cardTotalVal');
-      cardTotalValElem.innerText = sumTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      if (sumTotal >= 0) {
-        cardTotalValElem.className = 'text-3xl font-extrabold text-amber-400 mt-2 font-mono-val tracking-tight';
-      } else {
-        cardTotalValElem.className = 'text-3xl font-extrabold text-rose-400 mt-2 font-mono-val tracking-tight';
-      }
-
+      document.getElementById('cardTotalBuy').innerText = sumBuy.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+      document.getElementById('cardTotalSell').innerText = sumSell.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+      document.getElementById('cardTotalVal').innerText = sumTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
       document.getElementById('recordCount').innerText = `${filtered.length} entries`;
 
       tbody.innerHTML = '';
@@ -508,7 +597,7 @@
 
         const totalColor = row.total_val >= 0 ? 'text-emerald-400' : 'text-rose-400';
         tbody.innerHTML += `
-          <tr class="hover:bg-slate-800/40 transition duration-150">
+          <tr class="hover:bg-slate-800/40 transition">
             ${memberCell}
             <td class="p-3.5 text-slate-300">${row.entry_date}</td>
             <td class="p-3.5 font-sans font-semibold text-amber-300 text-xs">${row.day_name || '-'}</td>
@@ -529,8 +618,9 @@
     }
 
     function clearDateFilter() {
-      document.getElementById('filterStartDate').value = '';
-      document.getElementById('filterEndDate').value = '';
+      document.getElementById('filterDateRange').value = '';
+      startDateFilter = '';
+      endDateFilter = '';
       renderTable();
     }
 
@@ -549,36 +639,25 @@
         body: JSON.stringify(body)
       });
 
-      const resData = await res.json().catch(() => ({}));
-
       if (res.ok) {
         document.getElementById('buyVal').value = '';
         document.getElementById('sellVal').value = '';
-        if (currentUser.role === 'admin' && document.getElementById('memberSelect').value !== 'all') {
-          fetchDataForMember();
-        } else {
-          loadData();
-        }
+        loadData();
       } else {
-        alert('Data save karne me error aaya: ' + (resData.error || 'Server error'));
+        alert('Data save error');
       }
     }
 
     function openEditModal(id) {
       const entry = allEntries.find(e => e.id === id);
       if (!entry) return;
-
       document.getElementById('editEntryId').value = entry.id;
-      document.getElementById('editDate').value = entry.entry_date;
+      editDatePicker.setDate(entry.entry_date);
       document.getElementById('editBuyVal').value = entry.buy_val;
       document.getElementById('editSellVal').value = entry.sell_val;
-
       document.getElementById('editModal').classList.remove('hidden');
     }
-
-    function closeEditModal() {
-      document.getElementById('editModal').classList.add('hidden');
-    }
+    function closeEditModal() { document.getElementById('editModal').classList.add('hidden'); }
 
     async function submitEdit(e) {
       e.preventDefault();
@@ -596,107 +675,59 @@
         body: JSON.stringify(body)
       });
 
-      const resData = await res.json().catch(() => ({}));
       if (res.ok) {
         closeEditModal();
-        if (currentUser.role === 'admin' && document.getElementById('memberSelect').value !== 'all') {
-          fetchDataForMember();
-        } else {
-          loadData();
-        }
+        loadData();
       } else {
-        alert('Update error: ' + (resData.error || 'Update nahi ho paya!'));
+        alert('Update error');
       }
     }
 
     async function deleteEntry(id) {
-      if (!confirm('Kya aap sach me is entry ko delete karna chahte hain?')) return;
-
-      const res = await fetch(`/api/entries/${id}`, { 
-        method: 'DELETE',
-        credentials: 'include'
-      });
-
-      if (res.ok) {
-        if (currentUser.role === 'admin' && document.getElementById('memberSelect').value !== 'all') {
-          fetchDataForMember();
-        } else {
-          loadData();
-        }
-      } else {
-        alert('Delete nahi ho paya!');
-      }
+      if (!confirm('Kya aap is entry ko delete karna chahte hain?')) return;
+      const res = await fetch(`/api/entries/${id}`, { method: 'DELETE', credentials: 'include' });
+      if (res.ok) loadData();
     }
 
     function getFilteredData() {
-      const start = document.getElementById('filterStartDate').value;
-      const end = document.getElementById('filterEndDate').value;
       return allEntries.filter(row => {
-        if (start && row.entry_date < start) return false;
-        if (end && row.entry_date > end) return false;
+        if (startDateFilter && row.entry_date < startDateFilter) return false;
+        if (endDateFilter && row.entry_date > endDateFilter) return false;
         return true;
       });
     }
 
     function exportToExcel() {
       const data = getFilteredData();
-      if (data.length === 0) {
-        alert('Download karne ke liye koi data nahi hai!');
-        return;
-      }
-
-      const rows = data.map(item => {
-        const rowObj = {};
-        if (currentUser.role === 'admin') rowObj['Member'] = item.user_name;
-        rowObj['Date'] = item.entry_date;
-        rowObj['Day'] = item.day_name;
-        rowObj['Buy Value'] = Number(item.buy_val);
-        rowObj['Sell Value'] = Number(item.sell_val);
-        rowObj['Total Value'] = Number(item.total_val);
-        return rowObj;
-      });
-
-      const worksheet = XLSX.utils.json_to_sheet(rows);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Trades');
-      XLSX.writeFile(workbook, `Trade_Report_${currentUser.name}.xlsx`);
+      if (data.length === 0) return alert('No data to export');
+      const rows = data.map(item => ({
+        ...(currentUser.role === 'admin' ? { 'Member': item.user_name } : {}),
+        'Date': item.entry_date,
+        'Day': item.day_name,
+        'Buy Value': Number(item.buy_val),
+        'Sell Value': Number(item.sell_val),
+        'Total Value': Number(item.total_val)
+      }));
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Trades');
+      XLSX.writeFile(wb, `Trade_Report_${currentUser.name}.xlsx`);
     }
 
     function exportToPDF() {
       const data = getFilteredData();
-      if (data.length === 0) {
-        alert('Download karne ke liye koi data nahi hai!');
-        return;
-      }
-
+      if (data.length === 0) return alert('No data to export');
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
-
-      doc.setFontSize(16);
       doc.text(`Trade Statement - ${currentUser.name}`, 14, 15);
-      doc.setFontSize(10);
-      doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 22);
-
       const headers = currentUser.role === 'admin' 
         ? ['Member', 'Date', 'Day', 'BuyVal', 'SellVal', 'Total Value']
         : ['Date', 'Day', 'BuyVal', 'SellVal', 'Total Value'];
-
-      const tableRows = data.map(item => {
-        if (currentUser.role === 'admin') {
-          return [item.user_name, item.entry_date, item.day_name, Number(item.buy_val).toFixed(2), Number(item.sell_val).toFixed(2), Number(item.total_val).toFixed(2)];
-        }
-        return [item.entry_date, item.day_name, Number(item.buy_val).toFixed(2), Number(item.sell_val).toFixed(2), Number(item.total_val).toFixed(2)];
-      });
-
-      doc.autoTable({
-        head: [headers],
-        body: tableRows,
-        startY: 28,
-        theme: 'striped',
-        headStyles: { fillColor: [16, 185, 129] },
-        styles: { fontSize: 9 }
-      });
-
+      const tableRows = data.map(i => [
+        ...(currentUser.role === 'admin' ? [i.user_name] : []),
+        i.entry_date, i.day_name, Number(i.buy_val).toFixed(2), Number(i.sell_val).toFixed(2), Number(i.total_val).toFixed(2)
+      ]);
+      doc.autoTable({ head: [headers], body: tableRows, startY: 25, theme: 'striped' });
       doc.save(`Trade_Report_${currentUser.name}.pdf`);
     }
 
@@ -706,6 +737,183 @@
     }
 
     loadData();
+  </script>
+</body>
+</html>
+3. Login / Register Page with "Forgot Password" (public/index.html)
+Aapke login page me "Forgot / Reset Password" Modal integrate kiya gaya hai taaki agar koi password bhool jaye to Office Code verification ke sath turant naya password bana sake:
+
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - Trade Portal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #0b0f19; }
+    .glass-panel { background: rgba(17, 24, 39, 0.75); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); }
+  </style>
+</head>
+<body class="text-slate-100 flex items-center justify-center min-h-screen p-4">
+
+  <div class="glass-panel w-full max-w-md p-8 rounded-3xl shadow-2xl space-y-6">
+    <div class="text-center space-y-2">
+      <div class="w-12 h-12 rounded-2xl bg-emerald-500 text-slate-950 flex items-center justify-center mx-auto text-2xl font-bold">
+        <i class="bi bi-graph-up-arrow"></i>
+      </div>
+      <h2 class="text-2xl font-extrabold tracking-tight text-white">Trade Data Portal</h2>
+      <p class="text-xs text-slate-400">Login or reset your portal credentials</p>
+    </div>
+
+    <!-- Login Form -->
+    <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">User ID / MCX ID</label>
+        <input type="text" id="loginEmail" required class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm text-white outline-none focus:border-emerald-500">
+      </div>
+      <div>
+        <div class="flex justify-between items-center mb-1">
+          <label class="text-xs font-semibold text-slate-400">Password</label>
+          <button type="button" onclick="openResetModal()" class="text-[11px] text-emerald-400 hover:underline">Forgot Password?</button>
+        </div>
+        <input type="password" id="loginPassword" required class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm text-white outline-none focus:border-emerald-500">
+      </div>
+      <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 rounded-xl transition shadow-lg shadow-emerald-500/25">
+        Login to Dashboard
+      </button>
+    </form>
+
+    <div class="text-center pt-2 border-t border-slate-800">
+      <p class="text-xs text-slate-400">New Trader? <button onclick="toggleRegister()" class="text-emerald-400 font-semibold underline">Register here</button></p>
+    </div>
+
+    <!-- Register Form (Hidden by default) -->
+    <form id="registerForm" onsubmit="handleRegister(event)" class="hidden space-y-3 pt-2">
+      <div>
+        <label class="block text-xs text-slate-400">Full Name</label>
+        <input type="text" id="regName" required class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-sm text-white">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-400">User ID / MCX ID</label>
+        <input type="text" id="regEmail" required class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-sm text-white">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-400">WhatsApp / Phone</label>
+        <input type="text" id="regPhone" placeholder="+91..." class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-sm text-white">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-400">Gmail</label>
+        <input type="email" id="regGmail" placeholder="user@gmail.com" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-sm text-white">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-400">Password</label>
+        <input type="password" id="regPass" required class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-sm text-white">
+      </div>
+      <div>
+        <label class="block text-xs text-amber-400 font-bold">Office Passcode</label>
+        <input type="password" id="regOfficeCode" required placeholder="OFFICE@2026" class="w-full bg-slate-950 border border-amber-500/40 rounded-xl p-2.5 text-sm text-white">
+      </div>
+      <button type="submit" class="w-full bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold py-2.5 rounded-xl transition">
+        Create Account
+      </button>
+    </form>
+  </div>
+
+  <!-- Reset Password Modal -->
+  <div id="resetModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="glass-panel border border-slate-700 rounded-2xl p-6 w-full max-w-sm shadow-2xl space-y-4">
+      <h3 class="text-base font-bold text-emerald-400 flex items-center gap-2">
+        <i class="bi bi-key-fill"></i> Reset Password
+      </h3>
+      <form onsubmit="handleReset(event)" class="space-y-3">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Your Registered User ID</label>
+          <input type="text" id="resetEmail" required class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-sm text-white">
+        </div>
+        <div>
+          <label class="block text-xs text-amber-400 font-semibold mb-1">Office Passcode</label>
+          <input type="password" id="resetOfficeCode" required placeholder="OFFICE@2026" class="w-full bg-slate-950 border border-amber-500/40 rounded-xl p-2.5 text-sm text-white">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">New Password</label>
+          <input type="password" id="resetNewPass" required class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-sm text-white">
+        </div>
+        <div class="flex gap-2 pt-2">
+          <button type="button" onclick="closeResetModal()" class="w-1/2 bg-slate-800 text-slate-300 py-2 rounded-xl text-xs font-semibold">Cancel</button>
+          <button type="submit" class="w-1/2 bg-emerald-500 text-slate-950 py-2 rounded-xl text-xs font-bold">Reset Now</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    async function handleLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById('loginEmail').value;
+      const password = document.getElementById('loginPassword').value;
+
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        window.location.href = '/dashboard.html';
+      } else {
+        alert(data.error || 'Login failed');
+      }
+    }
+
+    function toggleRegister() {
+      document.getElementById('registerForm').classList.toggle('hidden');
+    }
+
+    async function handleRegister(e) {
+      e.preventDefault();
+      const body = {
+        name: document.getElementById('regName').value,
+        email: document.getElementById('regEmail').value,
+        phone: document.getElementById('regPhone').value,
+        gmail: document.getElementById('regGmail').value,
+        password: document.getElementById('regPass').value,
+        office_code: document.getElementById('regOfficeCode').value
+      };
+
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      alert(data.message || data.error);
+      if (res.ok) location.reload();
+    }
+
+    function openResetModal() { document.getElementById('resetModal').classList.remove('hidden'); }
+    function closeResetModal() { document.getElementById('resetModal').classList.add('hidden'); }
+
+    async function handleReset(e) {
+      e.preventDefault();
+      const body = {
+        email: document.getElementById('resetEmail').value,
+        office_code: document.getElementById('resetOfficeCode').value,
+        new_password: document.getElementById('resetNewPass').value
+      };
+
+      const res = await fetch('/api/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      alert(data.message || data.error);
+      if (res.ok) closeResetModal();
+    }
   </script>
 </body>
 </html>

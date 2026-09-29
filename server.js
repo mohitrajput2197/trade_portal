@@ -29,7 +29,7 @@ const pool = new Pool({
   ssl: dbConnectionString.includes('localhost') ? false : { rejectUnauthorized: false }
 });
 
-// Database Auto-Setup (PostgreSQL Tables)
+// Database Auto-Setup & Migrations (PostgreSQL Tables)
 async function initDB() {
   if (!dbConnectionString || dbConnectionString.includes('postgres://ucm8tmsvih2ol7:pf361b642d6f57e4eb6831650c9756630f9c82d7e5fbebd552e7308a719f3e5f8@cemv7jmv0b38gs.cluster-czrs8kj4isg7.us-east-1.rds.amazonaws.com:5432/d5sqh1meoa49i3')) {
     console.log('WARNING: DATABASE_URL set nahi hai. Heroku Settings se URL add karein.');
@@ -43,8 +43,14 @@ async function initDB() {
         name TEXT NOT NULL,
         email TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL,
-        role TEXT DEFAULT 'member'
+        role TEXT DEFAULT 'member',
+        phone TEXT DEFAULT '',
+        gmail TEXT DEFAULT ''
       );
+
+      -- Safe Columns Migration
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT DEFAULT '';
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS gmail TEXT DEFAULT '';
 
       CREATE TABLE IF NOT EXISTS trade_entries (
         id SERIAL PRIMARY KEY,
@@ -59,7 +65,7 @@ async function initDB() {
       );
     `);
     client.release();
-    console.log('PostgreSQL database connected and tables initialized successfully.');
+    console.log('PostgreSQL database connected and tables initialized/migrated successfully.');
   } catch (err) {
     console.error('PostgreSQL Database connection/init error:', err.message);
   }
@@ -90,12 +96,12 @@ function getDayNameFromDate(dateStr) {
 }
 
 // ==========================================
-// 2. AUTHENTICATION APIS
+// 2. AUTHENTICATION & PASSWORD APIS
 // ==========================================
 
-// Register API (MCX ID / Username + Office Passcode)
+// Register API (MCX ID / Username + Office Passcode + Phone/Gmail)
 app.post('/api/register', async (req, res) => {
-  const { name, email, password, office_code } = req.body;
+  const { name, email, password, office_code, phone, gmail } = req.body;
   if (!name || !email || !password || !office_code) {
     return res.status(400).json({ error: 'Sabhi fields aur Office Code bharna zaroori hai' });
   }
@@ -112,8 +118,8 @@ app.post('/api/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     await pool.query(
-      'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4)',
-      [name.trim(), cleanUsername, hashedPassword, role]
+      'INSERT INTO users (name, email, password, role, phone, gmail) VALUES ($1, $2, $3, $4, $5, $6)',
+      [name.trim(), cleanUsername, hashedPassword, role, (phone || '').trim(), (gmail || '').trim()]
     );
 
     res.json({ message: `Registration safal raha! (${role.toUpperCase()} Account). Ab login karein.` });
@@ -150,6 +156,55 @@ app.post('/api/login', async (req, res) => {
 app.post('/api/logout', (req, res) => {
   res.clearCookie('token');
   res.json({ message: 'Logged out' });
+});
+
+// Forgot / Reset Password API (Office Code Verify Karke Naya Password Banana)
+app.post('/api/reset-password', async (req, res) => {
+  const { email, office_code, new_password } = req.body;
+  if (!email || !office_code || !new_password) {
+    return res.status(400).json({ error: 'User ID, Office Code aur Naya Password sabhi bharein' });
+  }
+
+  if (office_code.trim() !== OFFICE_SECRET_CODE) {
+    return res.status(403).json({ error: 'Galat Office Passcode!' });
+  }
+
+  try {
+    const cleanUsername = email.trim().toLowerCase();
+    const userRes = await pool.query('SELECT id FROM users WHERE LOWER(email) = $1', [cleanUsername]);
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Yeh User ID registered nahi mili.' });
+    }
+
+    const hashedPassword = await bcrypt.hash(new_password.trim(), 10);
+    await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, userRes.rows[0].id]);
+
+    res.json({ success: true, message: 'Password successfully change ho gaya! Ab naye password se login karein.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error: ' + err.message });
+  }
+});
+
+// Update Profile API (User apna Phone/WhatsApp, Gmail ya Password badal sake)
+app.put('/api/profile', authMiddleware, async (req, res) => {
+  try {
+    const { phone, gmail, new_password } = req.body;
+    const userId = req.user.id;
+
+    if (new_password && new_password.trim().length > 0) {
+      const hashedPassword = await bcrypt.hash(new_password.trim(), 10);
+      await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, userId]);
+    }
+
+    await pool.query(
+      'UPDATE users SET phone = $1, gmail = $2 WHERE id = $3',
+      [(phone || '').trim(), (gmail || '').trim(), userId]
+    );
+
+    res.json({ success: true, message: 'Profile aur Settings successfully save ho gayi!' });
+  } catch (err) {
+    res.status(500).json({ error: 'Profile update failed: ' + err.message });
+  }
 });
 
 // ==========================================
@@ -208,9 +263,13 @@ app.put('/api/entries/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// Get Entries API
+// Get Entries API (User profile details ke sath)
 app.get('/api/entries', authMiddleware, async (req, res) => {
   try {
+    const userDetailRes = await pool.query('SELECT phone, gmail FROM users WHERE id = $1', [req.user.id]);
+    const phone = userDetailRes.rows[0]?.phone || '';
+    const gmail = userDetailRes.rows[0]?.gmail || '';
+
     let result;
     if (req.user.role === 'admin' && req.query.member_id) {
       if (req.query.member_id === 'all') {
@@ -239,7 +298,7 @@ app.get('/api/entries', authMiddleware, async (req, res) => {
       `, [req.user.id]);
     }
 
-    res.json({ user: req.user, entries: result.rows });
+    res.json({ user: { ...req.user, phone, gmail }, entries: result.rows });
   } catch (err) {
     res.status(500).json({ error: 'Fetch error: ' + err.message });
   }
@@ -261,21 +320,46 @@ app.delete('/api/entries/:id', authMiddleware, async (req, res) => {
 });
 
 // ==========================================
-// 4. MEMBERS MANAGEMENT (ADMIN ONLY)
+// 4. MEMBERS MANAGEMENT & ROLE CONTROL (ADMIN)
 // ==========================================
 
-// Get Members List
+// Get Members List (Phone aur Gmail ke sath)
 app.get('/api/members', authMiddleware, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Access denied' });
   try {
-    const result = await pool.query('SELECT id, name, email as username, role FROM users ORDER BY name ASC');
+    const result = await pool.query('SELECT id, name, email as username, role, phone, gmail FROM users ORDER BY name ASC');
     res.json({ members: result.rows });
   } catch (err) {
     res.status(500).json({ error: 'Fetch error: ' + err.message });
   }
 });
 
-// DELETE MEMBER / USER API (Added Update)
+// Change Member Role (Admin banana ya Member me convert karna)
+app.put('/api/members/:id/role', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Access denied. Sirf Admin role change kar sakta hai.' });
+  }
+
+  const targetId = parseInt(req.params.id, 10);
+  const { role } = req.body;
+
+  if (targetId === req.user.id) {
+    return res.status(400).json({ error: 'Aap apna khud ka role demote nahi kar sakte.' });
+  }
+
+  if (!['admin', 'member'].includes(role)) {
+    return res.status(400).json({ error: 'Invalid role' });
+  }
+
+  try {
+    await pool.query('UPDATE users SET role = $1 WHERE id = $2', [role, targetId]);
+    res.json({ success: true, message: `User role badal kar '${role.toUpperCase()}' kar diya gaya!` });
+  } catch (err) {
+    res.status(500).json({ error: 'Role change error: ' + err.message });
+  }
+});
+
+// Delete Member API
 app.delete('/api/members/:id', authMiddleware, async (req, res) => {
   if (req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Access denied. Sirf Admin hi user delete kar sakta hai.' });
@@ -283,16 +367,12 @@ app.delete('/api/members/:id', authMiddleware, async (req, res) => {
 
   const memberIdToDelete = parseInt(req.params.id, 10);
 
-  // Admin apne aap ko delete na kar sake
   if (req.user.id === memberIdToDelete) {
     return res.status(400).json({ error: 'Aap apna khud ka account delete nahi kar sakte.' });
   }
 
   try {
-    // trade_entries me user_id par ON DELETE CASCADE laga hai, 
-    // fir bhi direct delete safety ke liye:
     await pool.query('DELETE FROM trade_entries WHERE user_id = $1', [memberIdToDelete]);
-
     const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING id, name, email', [memberIdToDelete]);
 
     if (result.rows.length === 0) {
@@ -301,7 +381,7 @@ app.delete('/api/members/:id', authMiddleware, async (req, res) => {
 
     res.json({
       success: true,
-      message: `User '${result.rows[0].name}' (${result.rows[0].email}) aur unka trade data safaltapoorvak delete ho gaya!`
+      message: `User '${result.rows[0].name}' (${result.rows[0].email}) delete ho gaya!`
     });
   } catch (err) {
     console.error('User delete error:', err);
