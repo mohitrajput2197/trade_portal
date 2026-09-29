@@ -16,9 +16,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ==========================================
 // 1. DATABASE CONFIGURATION (HEROKU POSTGRES)
 // ==========================================
-// Agar locally test karna ho to quotes ke andar apna Heroku Postgres URL paste karein:
 const herokuPostgresUrl = 'postgres://ucm8tmsvih2ol7:pf361b642d6f57e4eb6831650c9756630f9c82d7e5fbebd552e7308a719f3e5f8@cemv7jmv0b38gs.cluster-czrs8kj4isg7.us-east-1.rds.amazonaws.com:5432/d5sqh1meoa49i3';
-const dbConnectionString = process.env.DATABASE_URL || herokuPostgresUrl;
+let dbConnectionString = process.env.DATABASE_URL || herokuPostgresUrl;
+
+// Heroku postgres:// ko postgresql:// me format karna
+if (dbConnectionString && dbConnectionString.startsWith('postgres://')) {
+  dbConnectionString = dbConnectionString.replace('postgres://', 'postgresql://');
+}
 
 const pool = new Pool({
   connectionString: dbConnectionString,
@@ -27,7 +31,7 @@ const pool = new Pool({
 
 // Database Auto-Setup (PostgreSQL Tables)
 async function initDB() {
-  if (!dbConnectionString || dbConnectionString.includes('YAHAN_WO_COPY_KIYA_POSTGRES_URL_PASTE_KAREIN')) {
+  if (!dbConnectionString || dbConnectionString.includes('postgres://ucm8tmsvih2ol7:pf361b642d6f57e4eb6831650c9756630f9c82d7e5fbebd552e7308a719f3e5f8@cemv7jmv0b38gs.cluster-czrs8kj4isg7.us-east-1.rds.amazonaws.com:5432/d5sqh1meoa49i3')) {
     console.log('WARNING: DATABASE_URL set nahi hai. Heroku Settings se URL add karein.');
     return;
   }
@@ -241,17 +245,6 @@ app.get('/api/entries', authMiddleware, async (req, res) => {
   }
 });
 
-// Get Members List (Admin Only)
-app.get('/api/members', authMiddleware, async (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Access denied' });
-  try {
-    const result = await pool.query('SELECT id, name, email as username, role FROM users ORDER BY name ASC');
-    res.json({ members: result.rows });
-  } catch (err) {
-    res.status(500).json({ error: 'Fetch error: ' + err.message });
-  }
-});
-
 // Delete Entry API
 app.delete('/api/entries/:id', authMiddleware, async (req, res) => {
   try {
@@ -268,7 +261,56 @@ app.delete('/api/entries/:id', authMiddleware, async (req, res) => {
 });
 
 // ==========================================
-// 4. ERROR GUARDS & SERVER START
+// 4. MEMBERS MANAGEMENT (ADMIN ONLY)
+// ==========================================
+
+// Get Members List
+app.get('/api/members', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Access denied' });
+  try {
+    const result = await pool.query('SELECT id, name, email as username, role FROM users ORDER BY name ASC');
+    res.json({ members: result.rows });
+  } catch (err) {
+    res.status(500).json({ error: 'Fetch error: ' + err.message });
+  }
+});
+
+// DELETE MEMBER / USER API (Added Update)
+app.delete('/api/members/:id', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Access denied. Sirf Admin hi user delete kar sakta hai.' });
+  }
+
+  const memberIdToDelete = parseInt(req.params.id, 10);
+
+  // Admin apne aap ko delete na kar sake
+  if (req.user.id === memberIdToDelete) {
+    return res.status(400).json({ error: 'Aap apna khud ka account delete nahi kar sakte.' });
+  }
+
+  try {
+    // trade_entries me user_id par ON DELETE CASCADE laga hai, 
+    // fir bhi direct delete safety ke liye:
+    await pool.query('DELETE FROM trade_entries WHERE user_id = $1', [memberIdToDelete]);
+
+    const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING id, name, email', [memberIdToDelete]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User nahi mila.' });
+    }
+
+    res.json({
+      success: true,
+      message: `User '${result.rows[0].name}' (${result.rows[0].email}) aur unka trade data safaltapoorvak delete ho gaya!`
+    });
+  } catch (err) {
+    console.error('User delete error:', err);
+    res.status(500).json({ error: 'Database error: ' + err.message });
+  }
+});
+
+// ==========================================
+// 5. ERROR GUARDS & SERVER START
 // ==========================================
 
 process.on('uncaughtException', (err) => {
