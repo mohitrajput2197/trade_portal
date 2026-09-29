@@ -3,131 +3,231 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Daily Data Entry Dashboard</title>
+  <title>Trade Data Portal - Pro Terminal</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #0b0f19;
+    }
+    .font-mono-val {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .glass-panel {
+      background: rgba(17, 24, 39, 0.75);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glass-panel-glow:hover {
+      border-color: rgba(52, 211, 153, 0.25);
+      box-shadow: 0 10px 30px -10px rgba(16, 185, 129, 0.15);
+    }
+    .ambient-glow {
+      position: fixed;
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      filter: blur(120px);
+      opacity: 0.15;
+      pointer-events: none;
+      z-index: 0;
+    }
+    input[type="date"]::-webkit-calendar-picker-indicator {
+      filter: invert(0.8);
+      cursor: pointer;
+    }
+  </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen">
+<body class="text-slate-100 min-h-screen relative overflow-x-hidden selection:bg-emerald-500 selection:text-black">
+
+  <!-- Subtle Ambient Glow Orbs -->
+  <div class="ambient-glow bg-emerald-500 -top-24 -left-24"></div>
+  <div class="ambient-glow bg-sky-500 top-1/2 -right-32"></div>
+  <div class="ambient-glow bg-amber-500 -bottom-24 left-1/3"></div>
 
   <!-- Top Navbar -->
-  <nav class="bg-slate-800 border-b border-slate-700 px-6 py-4 flex justify-between items-center shadow-lg">
+  <nav class="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800/80 px-6 py-3.5 flex justify-between items-center shadow-xl">
     <div class="flex items-center gap-3">
-      <h1 class="text-xl font-bold text-emerald-400">Trade Data Portal</h1>
-      <span id="roleBadge" class="hidden text-xs px-2.5 py-0.5 rounded-full font-semibold"></span>
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-slate-950 font-bold text-lg">
+        <i class="bi bi-graph-up-arrow"></i>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-lg font-extrabold tracking-tight bg-gradient-to-r from-emerald-400 via-teal-300 to-sky-400 bg-clip-text text-transparent">Trade Portal</h1>
+          <span id="roleBadge" class="hidden text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider"></span>
+        </div>
+        <p class="text-[11px] text-slate-400 font-medium">Daily Analytical Ledger</p>
+      </div>
     </div>
-    <div class="flex items-center gap-4">
+    
+    <div class="flex items-center gap-3">
       <!-- Admin Users Management Button -->
-      <button id="adminManageUsersBtn" onclick="openMemberModal()" class="hidden bg-amber-500/20 hover:bg-amber-500 hover:text-slate-950 text-amber-400 border border-amber-500/40 text-sm px-3 py-1.5 rounded-md font-semibold transition flex items-center gap-1.5">
-        👥 Manage Users
+      <button id="adminManageUsersBtn" onclick="openMemberModal()" class="hidden bg-amber-500/10 hover:bg-amber-500 text-amber-400 hover:text-slate-950 border border-amber-500/30 text-xs px-3.5 py-2 rounded-lg font-semibold transition-all duration-200 flex items-center gap-2 shadow-sm">
+        <i class="bi bi-people-fill text-sm"></i> Manage Users
       </button>
-      <span id="userName" class="text-slate-300 font-medium"></span>
-      <button onclick="logout()" class="bg-rose-500 hover:bg-rose-600 text-sm px-3 py-1.5 rounded-md font-semibold transition">Logout</button>
+      
+      <div class="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-lg">
+        <i class="bi bi-person-circle text-emerald-400 text-sm"></i>
+        <span id="userName" class="text-slate-300 font-semibold text-xs"></span>
+      </div>
+
+      <button onclick="logout()" class="bg-rose-500/10 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/30 text-xs px-3.5 py-2 rounded-lg font-semibold transition-all duration-200 flex items-center gap-1.5 shadow-sm">
+        <i class="bi bi-box-arrow-right"></i> Logout
+      </button>
     </div>
   </nav>
 
-  <div class="max-w-6xl mx-auto p-6 space-y-6">
+  <div class="relative z-10 max-w-6xl mx-auto p-6 space-y-6">
 
     <!-- 1. Daily Entry Form Card -->
-    <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-md">
-      <h2 class="text-lg font-semibold mb-4 text-emerald-300">Daily Trade Data Entry</h2>
-      <form id="entryForm" onsubmit="saveEntry(event)" class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+    <div class="glass-panel p-6 rounded-2xl shadow-xl transition-all">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-sm font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-2">
+          <i class="bi bi-plus-circle-fill"></i> New Trade Data Entry
+        </h2>
+        <span class="text-xs text-slate-400">Direct Ledger Sync</span>
+      </div>
+
+      <form id="entryForm" onsubmit="saveEntry(event)" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 items-end">
         <div>
-          <label class="block text-xs text-slate-400 mb-1">Date</label>
-          <input type="date" id="entryDate" required min="2020-01-01" max="2035-12-31" onchange="updateDayDisplay()" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white outline-none focus:border-emerald-500">
+          <label class="block text-xs font-semibold text-slate-400 mb-1.5">Trade Date</label>
+          <input type="date" id="entryDate" required min="2020-01-01" max="2035-12-31" onchange="updateDayDisplay()" class="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl p-2.5 text-sm text-white outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition font-mono-val">
         </div>
         <div>
-          <label class="block text-xs text-slate-400 mb-1">Day Name (Auto)</label>
-          <input type="text" id="dayDisplay" readonly class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-emerald-400 font-semibold cursor-not-allowed">
+          <label class="block text-xs font-semibold text-slate-400 mb-1.5">Weekday (Auto)</label>
+          <input type="text" id="dayDisplay" readonly class="w-full bg-slate-900/60 border border-slate-700/60 rounded-xl p-2.5 text-sm text-emerald-400 font-bold cursor-not-allowed">
         </div>
         <div>
-          <label class="block text-xs text-slate-400 mb-1">BuyVal</label>
-          <input type="number" step="0.01" id="buyVal" required placeholder="0.00" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white outline-none focus:border-emerald-500">
+          <label class="block text-xs font-semibold text-slate-400 mb-1.5">Buy Value (₹)</label>
+          <input type="number" step="0.01" id="buyVal" required placeholder="0.00" class="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl p-2.5 text-sm text-white outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition font-mono-val">
         </div>
         <div>
-          <label class="block text-xs text-slate-400 mb-1">SellVal</label>
-          <input type="number" step="0.01" id="sellVal" required placeholder="0.00" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white outline-none focus:border-emerald-500">
+          <label class="block text-xs font-semibold text-slate-400 mb-1.5">Sell Value (₹)</label>
+          <input type="number" step="0.01" id="sellVal" required placeholder="0.00" class="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl p-2.5 text-sm text-white outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition font-mono-val">
         </div>
         <div>
-          <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 font-medium py-2 rounded-lg transition shadow">Save Data</button>
+          <button type="submit" class="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold py-2.5 rounded-xl transition duration-200 shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2">
+            <i class="bi bi-check2-circle text-base"></i> Save Entry
+          </button>
         </div>
       </form>
     </div>
 
-    <!-- 2. Summary Cards (Total Buy & Total Sell) -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow flex items-center justify-between">
-        <div>
-          <p class="text-xs uppercase font-semibold text-slate-400">Total Buy Value</p>
-          <h3 id="cardTotalBuy" class="text-2xl font-bold text-sky-400 mt-1 font-mono">0.00</h3>
+    <!-- 2. Summary Cards (Total Buy, Total Sell & Total Combined Value) -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <!-- Buy Card -->
+      <div class="glass-panel glass-panel-glow p-5 rounded-2xl shadow-lg transition duration-300 relative overflow-hidden group">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-xs uppercase tracking-wider font-bold text-slate-400">Total Buy Value</p>
+            <h3 id="cardTotalBuy" class="text-3xl font-extrabold text-sky-400 mt-2 font-mono-val tracking-tight">0.00</h3>
+          </div>
+          <div class="w-12 h-12 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center text-xl group-hover:scale-110 transition duration-300">
+            <i class="bi bi-cart-check-fill"></i>
+          </div>
         </div>
-        <div class="bg-sky-500/20 text-sky-400 p-3 rounded-lg text-xl">🛒</div>
+        <div class="mt-3 text-[11px] text-slate-500 font-medium">Aggregated across active records</div>
       </div>
-      <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow flex items-center justify-between">
-        <div>
-          <p class="text-xs uppercase font-semibold text-slate-400">Total Sell Value</p>
-          <h3 id="cardTotalSell" class="text-2xl font-bold text-emerald-400 mt-1 font-mono">0.00</h3>
+
+      <!-- Sell Card -->
+      <div class="glass-panel glass-panel-glow p-5 rounded-2xl shadow-lg transition duration-300 relative overflow-hidden group">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-xs uppercase tracking-wider font-bold text-slate-400">Total Sell Value</p>
+            <h3 id="cardTotalSell" class="text-3xl font-extrabold text-emerald-400 mt-2 font-mono-val tracking-tight">0.00</h3>
+          </div>
+          <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center text-xl group-hover:scale-110 transition duration-300">
+            <i class="bi bi-cash-coin"></i>
+          </div>
         </div>
-        <div class="bg-emerald-500/20 text-emerald-400 p-3 rounded-lg text-xl">💰</div>
+        <div class="mt-3 text-[11px] text-slate-500 font-medium">Aggregated turnover credit</div>
+      </div>
+
+      <!-- Combined Total Card -->
+      <div class="glass-panel glass-panel-glow p-5 rounded-2xl shadow-lg transition duration-300 relative overflow-hidden group">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-xs uppercase tracking-wider font-bold text-slate-400">Combined Total Volume</p>
+            <h3 id="cardTotalVal" class="text-3xl font-extrabold text-amber-400 mt-2 font-mono-val tracking-tight">0.00</h3>
+          </div>
+          <div class="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center text-xl group-hover:scale-110 transition duration-300">
+            <i class="bi bi-bar-chart-line-fill"></i>
+          </div>
+        </div>
+        <div class="mt-3 text-[11px] text-slate-500 font-medium">Cumulative gross total turnover</div>
       </div>
     </div>
 
     <!-- 3. Filter & Admin Controls Toolbar -->
-    <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 flex flex-wrap items-center justify-between gap-4 shadow-md">
-      
+    <div class="glass-panel p-4 rounded-2xl flex flex-wrap items-center justify-between gap-4 shadow-lg">
       <div class="flex items-center gap-3 flex-wrap">
         <!-- Admin Member Selector Dropdown -->
-        <div id="adminMemberBox" class="hidden flex items-center gap-2">
-          <label class="text-xs text-amber-400 font-semibold">👤 Member:</label>
-          <select id="memberSelect" onchange="fetchDataForMember()" class="bg-slate-950 border border-slate-700 rounded-md p-1.5 text-xs text-white outline-none">
-            <option value="all">-- All Members --</option>
+        <div id="adminMemberBox" class="hidden flex items-center gap-2 bg-slate-900/80 px-3 py-1.5 rounded-xl border border-amber-500/30">
+          <label class="text-xs text-amber-400 font-bold flex items-center gap-1">
+            <i class="bi bi-person-fill"></i> Member:
+          </label>
+          <select id="memberSelect" onchange="fetchDataForMember()" class="bg-transparent text-xs text-white outline-none cursor-pointer">
+            <option value="all" class="bg-slate-900">-- All Members --</option>
           </select>
         </div>
 
         <!-- Calendar Filter -->
-        <span class="text-sm font-medium text-slate-300">📅 Calendar:</span>
-        <div>
-          <input type="date" id="filterStartDate" min="2020-01-01" max="2035-12-31" onchange="renderTable()" class="bg-slate-950 border border-slate-700 rounded-md p-1.5 text-xs text-white">
+        <div class="flex items-center gap-2 bg-slate-900/60 border border-slate-700/60 px-3 py-1.5 rounded-xl">
+          <span class="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+            <i class="bi bi-calendar-event"></i> Range:
+          </span>
+          <input type="date" id="filterStartDate" min="2020-01-01" max="2035-12-31" onchange="renderTable()" class="bg-slate-950 border border-slate-700/60 rounded-lg p-1 text-xs text-white outline-none font-mono-val">
+          <span class="text-xs text-slate-400 font-bold">→</span>
+          <input type="date" id="filterEndDate" min="2020-01-01" max="2035-12-31" onchange="renderTable()" class="bg-slate-950 border border-slate-700/60 rounded-lg p-1 text-xs text-white outline-none font-mono-val">
+          <button onclick="clearDateFilter()" class="text-xs text-slate-400 hover:text-white underline ml-1 font-semibold transition">Reset</button>
         </div>
-        <span class="text-xs text-slate-400">se</span>
-        <div>
-          <input type="date" id="filterEndDate" min="2020-01-01" max="2035-12-31" onchange="renderTable()" class="bg-slate-950 border border-slate-700 rounded-md p-1.5 text-xs text-white">
-        </div>
-        <button onclick="clearDateFilter()" class="text-xs text-slate-400 hover:text-white underline ml-1">Clear</button>
       </div>
 
       <!-- Export Buttons -->
       <div class="flex items-center gap-2">
-        <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded-lg font-semibold flex items-center gap-1.5 transition shadow">
-          📊 Download Excel
+        <button onclick="exportToExcel()" class="bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-500/30 text-xs px-3.5 py-2 rounded-xl font-semibold flex items-center gap-1.5 transition duration-200 shadow-sm">
+          <i class="bi bi-file-earmark-excel-fill"></i> Excel
         </button>
-        <button onclick="exportToPDF()" class="bg-rose-600 hover:bg-rose-700 text-white text-xs px-3 py-2 rounded-lg font-semibold flex items-center gap-1.5 transition shadow">
-          📄 Download PDF
+        <button onclick="exportToPDF()" class="bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/30 text-xs px-3.5 py-2 rounded-xl font-semibold flex items-center gap-1.5 transition duration-200 shadow-sm">
+          <i class="bi bi-file-earmark-pdf-fill"></i> PDF
         </button>
       </div>
     </div>
 
     <!-- 4. History Table Card -->
-    <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden shadow-md">
-      <div class="p-4 border-b border-slate-700 flex justify-between items-center">
-        <h3 class="font-semibold text-slate-200">Daily Entry Record</h3>
-        <span id="recordCount" class="text-xs text-slate-400"></span>
+    <div class="glass-panel rounded-2xl overflow-hidden shadow-xl">
+      <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950/40">
+        <div class="flex items-center gap-2">
+          <i class="bi bi-clock-history text-slate-400"></i>
+          <h3 class="font-bold text-sm text-slate-200 uppercase tracking-wide">Historical Transaction Ledger</h3>
+        </div>
+        <span id="recordCount" class="text-xs px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-300 font-mono-val"></span>
       </div>
       <div class="overflow-x-auto">
         <table class="w-full text-left border-collapse text-sm">
-          <thead class="bg-slate-950 text-slate-400 uppercase text-xs">
+          <thead class="bg-slate-950/80 text-slate-400 uppercase text-[11px] tracking-wider border-b border-slate-800">
             <tr>
-              <th class="p-3" id="memberColHeader" style="display: none;">Member</th>
-              <th class="p-3">Date</th>
-              <th class="p-3">Day</th>
-              <th class="p-3 text-right">BuyVal</th>
-              <th class="p-3 text-right">SellVal</th>
-              <th class="p-3 text-right">Total Value</th>
-              <th class="p-3 text-center">Action</th>
+              <th class="p-3.5" id="memberColHeader" style="display: none;">Member</th>
+              <th class="p-3.5">Date</th>
+              <th class="p-3.5">Day</th>
+              <th class="p-3.5 text-right">BuyVal (₹)</th>
+              <th class="p-3.5 text-right">SellVal (₹)</th>
+              <th class="p-3.5 text-right">Total Value (₹)</th>
+              <th class="p-3.5 text-center">Action</th>
             </tr>
           </thead>
-          <tbody id="tableBody" class="divide-y divide-slate-700 font-mono">
+          <tbody id="tableBody" class="divide-y divide-slate-800/80 font-mono-val">
           </tbody>
         </table>
       </div>
@@ -136,44 +236,50 @@
   </div>
 
   <!-- 5. Edit Modal Popup -->
-  <div id="editModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-md shadow-2xl space-y-4">
-      <h3 class="text-lg font-bold text-amber-400">Edit Trade Entry</h3>
-      <form id="editForm" onsubmit="submitEdit(event)" class="space-y-3">
+  <div id="editModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity">
+    <div class="glass-panel border border-slate-700/80 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <h3 class="text-base font-bold text-amber-400 flex items-center gap-2">
+          <i class="bi bi-pencil-square"></i> Edit Trade Entry
+        </h3>
+        <button onclick="closeEditModal()" class="text-slate-400 hover:text-white text-xl font-bold">&times;</button>
+      </div>
+
+      <form id="editForm" onsubmit="submitEdit(event)" class="space-y-4">
         <input type="hidden" id="editEntryId">
         <div>
-          <label class="block text-xs text-slate-400 mb-1">Date</label>
-          <input type="date" id="editDate" required min="2020-01-01" max="2035-12-31" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white outline-none focus:border-amber-500">
+          <label class="block text-xs font-semibold text-slate-400 mb-1">Date</label>
+          <input type="date" id="editDate" required min="2020-01-01" max="2035-12-31" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white outline-none focus:border-amber-500 font-mono-val">
         </div>
         <div>
-          <label class="block text-xs text-slate-400 mb-1">BuyVal</label>
-          <input type="number" step="0.01" id="editBuyVal" required class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white outline-none focus:border-amber-500">
+          <label class="block text-xs font-semibold text-slate-400 mb-1">Buy Value (₹)</label>
+          <input type="number" step="0.01" id="editBuyVal" required class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white outline-none focus:border-amber-500 font-mono-val">
         </div>
         <div>
-          <label class="block text-xs text-slate-400 mb-1">SellVal</label>
-          <input type="number" step="0.01" id="editSellVal" required class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white outline-none focus:border-amber-500">
+          <label class="block text-xs font-semibold text-slate-400 mb-1">Sell Value (₹)</label>
+          <input type="number" step="0.01" id="editSellVal" required class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white outline-none focus:border-amber-500 font-mono-val">
         </div>
-        <div class="flex gap-2 pt-2">
-          <button type="button" onclick="closeEditModal()" class="w-1/2 bg-slate-700 hover:bg-slate-600 py-2 rounded-lg text-sm font-semibold transition">Cancel</button>
-          <button type="submit" class="w-1/2 bg-amber-500 hover:bg-amber-600 text-slate-950 py-2 rounded-lg text-sm font-bold transition">Update Data</button>
+        <div class="flex gap-3 pt-2">
+          <button type="button" onclick="closeEditModal()" class="w-1/2 bg-slate-800 hover:bg-slate-700 border border-slate-700 py-2.5 rounded-xl text-xs font-semibold transition">Cancel</button>
+          <button type="submit" class="w-1/2 bg-amber-500 hover:bg-amber-400 text-slate-950 py-2.5 rounded-xl text-xs font-bold transition shadow-lg shadow-amber-500/20">Update Entry</button>
         </div>
       </form>
     </div>
   </div>
 
   <!-- 6. Member Management Modal (Admin Only) -->
-  <div id="memberModal" class="hidden fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-50">
-    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-2xl shadow-2xl space-y-4">
-      <div class="flex justify-between items-center border-b border-slate-700 pb-3">
-        <h3 class="text-lg font-bold text-amber-400 flex items-center gap-2">
-          👥 Registered Members Management
+  <div id="memberModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="glass-panel border border-slate-700/80 rounded-2xl p-6 w-full max-w-2xl shadow-2xl space-y-4">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <h3 class="text-base font-bold text-amber-400 flex items-center gap-2">
+          <i class="bi bi-people-fill"></i> Registered Members Management
         </h3>
         <button onclick="closeMemberModal()" class="text-slate-400 hover:text-white text-xl font-bold">&times;</button>
       </div>
 
-      <div class="overflow-x-auto max-h-96">
+      <div class="overflow-x-auto max-h-96 rounded-xl border border-slate-800">
         <table class="w-full text-left border-collapse text-sm">
-          <thead class="bg-slate-950 text-slate-400 uppercase text-xs sticky top-0">
+          <thead class="bg-slate-950 text-slate-400 uppercase text-[11px] sticky top-0 border-b border-slate-800">
             <tr>
               <th class="p-3">ID</th>
               <th class="p-3">Name</th>
@@ -182,14 +288,14 @@
               <th class="p-3 text-center">Action</th>
             </tr>
           </thead>
-          <tbody id="memberListTableBody" class="divide-y divide-slate-700 font-sans">
+          <tbody id="memberListTableBody" class="divide-y divide-slate-800/80 font-sans">
             <tr><td colspan="5" class="p-4 text-center text-slate-400">Loading members...</td></tr>
           </tbody>
         </table>
       </div>
 
-      <div class="flex justify-end pt-2 border-t border-slate-700">
-        <button type="button" onclick="closeMemberModal()" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">Close</button>
+      <div class="flex justify-end pt-2 border-t border-slate-800">
+        <button type="button" onclick="closeMemberModal()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white px-4 py-2 rounded-xl text-xs font-semibold transition">Close</button>
       </div>
     </div>
   </div>
@@ -237,20 +343,20 @@
       currentUser = data.user;
       allEntries = data.entries;
 
-      document.getElementById('userName').innerText = 'User: ' + currentUser.name;
+      document.getElementById('userName').innerText = currentUser.name;
       
       const badge = document.getElementById('roleBadge');
       badge.classList.remove('hidden');
       if (currentUser.role === 'admin') {
         badge.innerText = 'ADMIN';
-        badge.classList.add('bg-amber-500/20', 'text-amber-400', 'border', 'border-amber-500/30');
+        badge.className = 'text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40';
         document.getElementById('adminMemberBox').classList.remove('hidden');
         document.getElementById('adminManageUsersBtn').classList.remove('hidden');
         document.getElementById('memberColHeader').style.display = 'table-cell';
         loadMemberList();
       } else {
         badge.innerText = 'MEMBER';
-        badge.classList.add('bg-emerald-500/20', 'text-emerald-400');
+        badge.className = 'text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
       }
 
       renderTable();
@@ -262,15 +368,14 @@
         const { members } = await res.json();
         const select = document.getElementById('memberSelect');
         const currentSelected = select.value;
-        select.innerHTML = '<option value="all">-- All Members --</option>';
+        select.innerHTML = '<option value="all" class="bg-slate-900">-- All Members --</option>';
         members.forEach(m => {
-          select.innerHTML += `<option value="${m.id}">${m.name} (${m.role})</option>`;
+          select.innerHTML += `<option value="${m.id}" class="bg-slate-900">${m.name} (${m.role})</option>`;
         });
         if (currentSelected) select.value = currentSelected;
       }
     }
 
-    // --- Admin Member Management Modal Functions ---
     async function openMemberModal() {
       document.getElementById('memberModal').classList.remove('hidden');
       await refreshMemberListInModal();
@@ -298,18 +403,18 @@
         members.forEach(m => {
           const isSelf = currentUser && currentUser.id === m.id;
           const roleBadge = m.role === 'admin' 
-            ? `<span class="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs px-2 py-0.5 rounded-full font-semibold">ADMIN</span>`
-            : `<span class="bg-slate-700 text-slate-300 text-xs px-2 py-0.5 rounded-full">MEMBER</span>`;
+            ? `<span class="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] px-2 py-0.5 rounded-full font-bold">ADMIN</span>`
+            : `<span class="bg-slate-800 text-slate-300 border border-slate-700 text-[11px] px-2 py-0.5 rounded-full font-medium">MEMBER</span>`;
 
           const actionBtn = isSelf 
-            ? `<span class="text-xs text-slate-500 italic">Current User</span>`
-            : `<button onclick="deleteMember(${m.id}, '${m.name}')" class="text-xs bg-rose-500/20 text-rose-400 hover:bg-rose-500 hover:text-white px-2.5 py-1 rounded transition font-semibold">Delete User</button>`;
+            ? `<span class="text-xs text-slate-500 font-semibold italic">Current Admin</span>`
+            : `<button onclick="deleteMember(${m.id}, '${m.name}')" class="text-xs bg-rose-500/15 text-rose-400 hover:bg-rose-500 hover:text-white border border-rose-500/30 px-3 py-1 rounded-lg transition font-semibold">Delete</button>`;
 
           tbody.innerHTML += `
-            <tr class="hover:bg-slate-700/50">
-              <td class="p-3 font-mono text-xs text-slate-400">${m.id}</td>
-              <td class="p-3 font-semibold text-slate-200">${m.name}</td>
-              <td class="p-3 font-mono text-xs text-slate-300">${m.username}</td>
+            <tr class="hover:bg-slate-800/40 transition">
+              <td class="p-3 font-mono-val text-xs text-slate-400">#${m.id}</td>
+              <td class="p-3 font-bold text-slate-200">${m.name}</td>
+              <td class="p-3 font-mono-val text-xs text-slate-400">${m.username}</td>
               <td class="p-3">${roleBadge}</td>
               <td class="p-3 text-center">${actionBtn}</td>
             </tr>
@@ -368,42 +473,54 @@
 
       let sumBuy = 0;
       let sumSell = 0;
+      let sumTotal = 0;
+
       filtered.forEach(r => {
         sumBuy += Number(r.buy_val) || 0;
         sumSell += Number(r.sell_val) || 0;
+        sumTotal += Number(r.total_val) || 0;
       });
 
-      document.getElementById('cardTotalBuy').innerText = sumBuy.toFixed(2);
-      document.getElementById('cardTotalSell').innerText = sumSell.toFixed(2);
-      document.getElementById('recordCount').innerText = `Total: ${filtered.length} entries`;
+      document.getElementById('cardTotalBuy').innerText = sumBuy.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      document.getElementById('cardTotalSell').innerText = sumSell.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      const cardTotalValElem = document.getElementById('cardTotalVal');
+      cardTotalValElem.innerText = sumTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      if (sumTotal >= 0) {
+        cardTotalValElem.className = 'text-3xl font-extrabold text-amber-400 mt-2 font-mono-val tracking-tight';
+      } else {
+        cardTotalValElem.className = 'text-3xl font-extrabold text-rose-400 mt-2 font-mono-val tracking-tight';
+      }
+
+      document.getElementById('recordCount').innerText = `${filtered.length} entries`;
 
       tbody.innerHTML = '';
       if (filtered.length === 0) {
         const colSpan = currentUser && currentUser.role === 'admin' ? 7 : 6;
-        tbody.innerHTML = `<tr><td colspan="${colSpan}" class="p-4 text-center text-slate-500">Koi record nahi mila.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="${colSpan}" class="p-6 text-center text-slate-500 font-medium">Koi transaction record nahi mila.</td></tr>`;
         return;
       }
 
       filtered.forEach(row => {
         const memberCell = (currentUser && currentUser.role === 'admin') 
-          ? `<td class="p-3 text-slate-300 font-sans text-xs">${row.user_name || '-'}</td>` 
+          ? `<td class="p-3.5 text-slate-300 font-sans text-xs font-semibold">${row.user_name || '-'}</td>` 
           : '';
 
         const totalColor = row.total_val >= 0 ? 'text-emerald-400' : 'text-rose-400';
         tbody.innerHTML += `
-          <tr class="hover:bg-slate-700/50">
+          <tr class="hover:bg-slate-800/40 transition duration-150">
             ${memberCell}
-            <td class="p-3">${row.entry_date}</td>
-            <td class="p-3 font-sans font-medium text-amber-300 text-xs">${row.day_name || '-'}</td>
-            <td class="p-3 text-right text-slate-300">${Number(row.buy_val).toFixed(2)}</td>
-            <td class="p-3 text-right text-slate-300">${Number(row.sell_val).toFixed(2)}</td>
-            <td class="p-3 text-right font-bold ${totalColor}">${Number(row.total_val).toFixed(2)}</td>
-            <td class="p-3 text-center space-x-1">
-              <button onclick="openEditModal(${row.id})" class="text-xs bg-amber-500/20 text-amber-400 hover:bg-amber-500 hover:text-slate-900 px-2 py-1 rounded transition font-medium">
-                Edit
+            <td class="p-3.5 text-slate-300">${row.entry_date}</td>
+            <td class="p-3.5 font-sans font-semibold text-amber-300 text-xs">${row.day_name || '-'}</td>
+            <td class="p-3.5 text-right text-slate-300">${Number(row.buy_val).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+            <td class="p-3.5 text-right text-slate-300">${Number(row.sell_val).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+            <td class="p-3.5 text-right font-bold ${totalColor}">${Number(row.total_val).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+            <td class="p-3.5 text-center space-x-1.5 font-sans">
+              <button onclick="openEditModal(${row.id})" class="text-xs bg-amber-500/10 text-amber-400 hover:bg-amber-500 hover:text-slate-950 border border-amber-500/30 px-2.5 py-1 rounded-lg transition font-semibold">
+                <i class="bi bi-pencil"></i>
               </button>
-              <button onclick="deleteEntry(${row.id})" class="text-xs bg-rose-500/20 text-rose-400 hover:bg-rose-500 hover:text-white px-2 py-1 rounded transition font-medium">
-                Delete
+              <button onclick="deleteEntry(${row.id})" class="text-xs bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white border border-rose-500/30 px-2.5 py-1 rounded-lg transition font-semibold">
+                <i class="bi bi-trash3"></i>
               </button>
             </td>
           </tr>
@@ -417,7 +534,6 @@
       renderTable();
     }
 
-    // Save Entry Function
     async function saveEntry(e) {
       e.preventDefault();
       const body = {
@@ -448,7 +564,6 @@
       }
     }
 
-    // Edit Modal Open & Populate
     function openEditModal(id) {
       const entry = allEntries.find(e => e.id === id);
       if (!entry) return;
@@ -465,7 +580,6 @@
       document.getElementById('editModal').classList.add('hidden');
     }
 
-    // Submit Edit
     async function submitEdit(e) {
       e.preventDefault();
       const id = document.getElementById('editEntryId').value;
@@ -495,7 +609,6 @@
       }
     }
 
-    // Delete Entry Function
     async function deleteEntry(id) {
       if (!confirm('Kya aap sach me is entry ko delete karna chahte hain?')) return;
 
