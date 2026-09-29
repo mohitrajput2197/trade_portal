@@ -3,133 +3,267 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login / Member Registration - Trade Portal</title>
+  <title>Login - Trade Portal</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #0b0f19;
+    }
+    .font-mono-val {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .glass-panel {
+      background: rgba(17, 24, 39, 0.75);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .ambient-glow {
+      position: fixed;
+      width: 450px;
+      height: 450px;
+      border-radius: 50%;
+      filter: blur(120px);
+      opacity: 0.15;
+      pointer-events: none;
+      z-index: 0;
+    }
+  </style>
 </head>
-<body class="bg-slate-900 text-white min-h-screen flex items-center justify-center p-4">
+<body class="text-slate-100 flex items-center justify-center min-h-screen p-4 relative overflow-hidden selection:bg-emerald-500 selection:text-black">
 
-  <div class="bg-slate-800 p-8 rounded-2xl border border-slate-700 w-full max-w-md shadow-2xl space-y-6">
+  <!-- Ambient Glow Background -->
+  <div class="ambient-glow bg-emerald-500 -top-24 -left-24"></div>
+  <div class="ambient-glow bg-sky-500 -bottom-24 -right-24"></div>
+
+  <div class="glass-panel w-full max-w-md p-8 rounded-3xl shadow-2xl space-y-6 relative z-10 border border-slate-700/80">
     
-    <div class="text-center">
-      <h1 class="text-2xl font-bold text-emerald-400">Trade Data Portal</h1>
-      <p class="text-xs text-amber-300 mt-1 font-medium">🔒 Internal Office Portal</p>
+    <!-- Branding Header -->
+    <div class="text-center space-y-2">
+      <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 text-slate-950 flex items-center justify-center mx-auto text-2xl font-bold shadow-lg shadow-emerald-500/25">
+        <i class="bi bi-graph-up-arrow"></i>
+      </div>
+      <h2 class="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-emerald-400 via-teal-300 to-sky-400 bg-clip-text text-transparent">Trade Data Portal</h2>
+      <p class="text-xs text-slate-400 font-medium" id="pageSubtitle">Enter your credentials to access trading terminal</p>
     </div>
 
-    <!-- Toggle Tabs (Login vs Register) -->
-    <div class="flex bg-slate-950 p-1 rounded-xl border border-slate-700">
-      <button id="tabLogin" onclick="setMode(true)" class="w-1/2 py-2 text-sm font-semibold rounded-lg bg-emerald-500 text-slate-950 transition">
-        Login
-      </button>
-      <button id="tabRegister" onclick="setMode(false)" class="w-1/2 py-2 text-sm font-semibold rounded-lg text-slate-400 hover:text-white transition">
-        Office Staff Signup
-      </button>
-    </div>
-
-    <!-- Form -->
-    <form onsubmit="handleSubmit(event)" class="space-y-4">
-      <div id="nameBox" class="hidden">
-        <label class="block text-xs text-slate-400 mb-1">Staff Member Name</label>
-        <input type="text" id="name" placeholder="Rahul Sharma" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white outline-none focus:border-emerald-500">
-      </div>
-
-      <!-- Office Passcode Input (Sirf Signup par dikhega) -->
-      <div id="codeBox" class="hidden">
-        <label class="block text-xs text-amber-300 mb-1 font-semibold">🔑 Office Secret Passcode</label>
-        <input type="password" id="office_code" placeholder="Enter Office Code" class="w-full bg-slate-950 border border-amber-500/50 rounded-lg p-2.5 text-white outline-none focus:border-amber-400">
-        <p class="text-[11px] text-slate-400 mt-1">Sirf office members ke paas ye passcode hai.</p>
-      </div>
-
-      <!-- Email ki jagah Username / MCX ID -->
+    <!-- Login Form -->
+    <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
       <div>
-        <label class="block text-xs text-slate-400 mb-1">User ID / MCX ID (e.g. mcx102)</label>
-        <input type="text" id="email" required placeholder="mcx102 ya email" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white outline-none focus:border-emerald-500">
+        <label class="block text-xs font-semibold text-slate-400 mb-1.5">User ID / MCX ID</label>
+        <div class="relative">
+          <input type="text" id="loginEmail" required placeholder="Enter User ID" class="w-full bg-slate-950 border border-slate-700/80 rounded-xl p-3 text-sm text-white outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition font-mono-val pl-10">
+          <i class="bi bi-person text-slate-500 absolute left-3.5 top-3.5 text-base"></i>
+        </div>
       </div>
 
       <div>
-        <label class="block text-xs text-slate-400 mb-1">Password</label>
-        <input type="password" id="password" required placeholder="••••••••" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white outline-none focus:border-emerald-500">
+        <div class="flex justify-between items-center mb-1.5">
+          <label class="text-xs font-semibold text-slate-400">Password</label>
+          <button type="button" onclick="openResetModal()" class="text-[11px] text-emerald-400 hover:text-emerald-300 font-semibold underline">Forgot Password?</button>
+        </div>
+        <div class="relative">
+          <input type="password" id="loginPassword" required placeholder="••••••••" class="w-full bg-slate-950 border border-slate-700/80 rounded-xl p-3 text-sm text-white outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition font-mono-val pl-10">
+          <i class="bi bi-key text-slate-500 absolute left-3.5 top-3.5 text-base"></i>
+        </div>
       </div>
 
-      <button type="submit" id="submitBtn" class="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-3 rounded-lg transition shadow-lg mt-2">
-        Login Karein
+      <button type="submit" id="loginBtn" class="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold py-3 rounded-xl transition duration-200 shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2">
+        <i class="bi bi-box-arrow-in-right text-lg"></i> Login to Portal
       </button>
     </form>
 
-    <div id="statusMsg" class="text-xs text-center hidden p-2.5 rounded-lg"></div>
+    <!-- Register Form (Toggleable) -->
+    <form id="registerForm" onsubmit="handleRegister(event)" class="hidden space-y-3.5 pt-2 border-t border-slate-800">
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">Full Name</label>
+        <input type="text" id="regName" required placeholder="Trader Name" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-sm text-white outline-none focus:border-emerald-500">
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">User ID / MCX ID</label>
+        <input type="text" id="regEmail" required placeholder="Desired User ID" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-sm text-white font-mono-val outline-none focus:border-emerald-500">
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1 flex items-center gap-1">
+            <i class="bi bi-whatsapp text-emerald-400"></i> WhatsApp No.
+          </label>
+          <input type="text" id="regPhone" placeholder="+91..." class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-sm text-white font-mono-val outline-none focus:border-emerald-500">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1 flex items-center gap-1">
+            <i class="bi bi-envelope text-sky-400"></i> Gmail
+          </label>
+          <input type="email" id="regGmail" placeholder="id@gmail.com" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-sm text-white font-mono-val outline-none focus:border-emerald-500">
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">Password</label>
+        <input type="password" id="regPass" required placeholder="Create Password" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-sm text-white outline-none focus:border-emerald-500">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-amber-400 mb-1 flex items-center gap-1">
+          <i class="bi bi-shield-check"></i> Office Passcode
+        </label>
+        <input type="password" id="regOfficeCode" required placeholder="OFFICE@2026" class="w-full bg-slate-950 border border-amber-500/40 rounded-xl p-2.5 text-sm text-white outline-none focus:border-amber-400 font-mono-val">
+      </div>
+      <button type="submit" class="w-full bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold py-2.5 rounded-xl transition shadow-lg shadow-teal-500/25">
+        Register Account
+      </button>
+    </form>
 
+    <!-- Bottom Switcher -->
+    <div class="text-center pt-2 border-t border-slate-800">
+      <p class="text-xs text-slate-400" id="switchText">
+        New to Portal? 
+        <button type="button" onclick="toggleFormView()" class="text-emerald-400 font-semibold underline hover:text-emerald-300 ml-1">Create an Account</button>
+      </p>
+    </div>
+  </div>
+
+  <!-- Forgot / Reset Password Modal -->
+  <div id="resetModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="glass-panel border border-slate-700/80 rounded-2xl p-6 w-full max-w-sm shadow-2xl space-y-4">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <h3 class="text-base font-bold text-emerald-400 flex items-center gap-2">
+          <i class="bi bi-key-fill"></i> Reset Password
+        </h3>
+        <button onclick="closeResetModal()" class="text-slate-400 hover:text-white text-xl font-bold">&times;</button>
+      </div>
+
+      <form onsubmit="handleReset(event)" class="space-y-3.5">
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">Your Registered User ID</label>
+          <input type="text" id="resetEmail" required placeholder="Enter User ID" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-sm text-white font-mono-val outline-none focus:border-emerald-500">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-amber-400 mb-1">Office Passcode</label>
+          <input type="password" id="resetOfficeCode" required placeholder="OFFICE@2026" class="w-full bg-slate-950 border border-amber-500/40 rounded-xl p-2.5 text-sm text-white font-mono-val outline-none focus:border-amber-400">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">New Password</label>
+          <input type="password" id="resetNewPass" required placeholder="Enter New Password" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-sm text-white outline-none focus:border-emerald-500">
+        </div>
+        <div class="flex gap-2 pt-2">
+          <button type="button" onclick="closeResetModal()" class="w-1/2 bg-slate-800 hover:bg-slate-700 text-slate-300 py-2.5 rounded-xl text-xs font-semibold transition">Cancel</button>
+          <button type="submit" class="w-1/2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 py-2.5 rounded-xl text-xs font-bold transition">Update Password</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <script>
-    let isLogin = true;
+    let isRegisterView = false;
 
-    function setMode(loginMode) {
-      isLogin = loginMode;
-      const tabLogin = document.getElementById('tabLogin');
-      const tabRegister = document.getElementById('tabRegister');
-      const nameBox = document.getElementById('nameBox');
-      const codeBox = document.getElementById('codeBox');
-      const submitBtn = document.getElementById('submitBtn');
-      const statusMsg = document.getElementById('statusMsg');
+    function toggleFormView() {
+      isRegisterView = !isRegisterView;
+      const loginForm = document.getElementById('loginForm');
+      const registerForm = document.getElementById('registerForm');
+      const subtitle = document.getElementById('pageSubtitle');
+      const switchText = document.getElementById('switchText');
 
-      statusMsg.classList.add('hidden');
-
-      if (isLogin) {
-        tabLogin.className = "w-1/2 py-2 text-sm font-semibold rounded-lg bg-emerald-500 text-slate-950 transition";
-        tabRegister.className = "w-1/2 py-2 text-sm font-semibold rounded-lg text-slate-400 hover:text-white transition";
-        nameBox.classList.add('hidden');
-        codeBox.classList.add('hidden');
-        document.getElementById('name').removeAttribute('required');
-        document.getElementById('office_code').removeAttribute('required');
-        submitBtn.innerText = "Login Karein";
+      if (isRegisterView) {
+        loginForm.classList.add('hidden');
+        registerForm.classList.remove('hidden');
+        subtitle.innerText = 'Create your new trader portal account';
+        switchText.innerHTML = `Already have an account? <button type="button" onclick="toggleFormView()" class="text-emerald-400 font-semibold underline hover:text-emerald-300 ml-1">Login here</button>`;
       } else {
-        tabRegister.className = "w-1/2 py-2 text-sm font-semibold rounded-lg bg-emerald-500 text-slate-950 transition";
-        tabLogin.className = "w-1/2 py-2 text-sm font-semibold rounded-lg text-slate-400 hover:text-white transition";
-        nameBox.classList.remove('hidden');
-        codeBox.classList.remove('hidden');
-        document.getElementById('name').setAttribute('required', 'true');
-        document.getElementById('office_code').setAttribute('required', 'true');
-        submitBtn.innerText = "Staff Account Banayein";
+        loginForm.classList.remove('hidden');
+        registerForm.classList.add('hidden');
+        subtitle.innerText = 'Enter your credentials to access trading terminal';
+        switchText.innerHTML = `New to Portal? <button type="button" onclick="toggleFormView()" class="text-emerald-400 font-semibold underline hover:text-emerald-300 ml-1">Create an Account</button>`;
       }
     }
 
-    async function handleSubmit(e) {
+    // Login Action
+    async function handleLogin(e) {
       e.preventDefault();
-      const statusMsg = document.getElementById('statusMsg');
-      const email = document.getElementById('email').value; // Username / MCX ID
-      const password = document.getElementById('password').value;
-      const name = document.getElementById('name').value;
-      const office_code = document.getElementById('office_code').value;
-
-      const url = isLogin ? '/api/login' : '/api/register';
-      const body = isLogin ? { email, password } : { name, email, password, office_code };
+      const email = document.getElementById('loginEmail').value.trim();
+      const password = document.getElementById('loginPassword').value;
 
       try {
-        const res = await fetch(url, {
+        const res = await fetch('/api/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify(body)
+          body: JSON.stringify({ email, password })
         });
-        const data = await res.json();
 
+        const data = await res.json();
         if (res.ok) {
-          if (isLogin) {
-            window.location.href = '/dashboard.html';
-          } else {
-            statusMsg.className = "text-xs text-center p-2.5 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
-            statusMsg.innerText = data.message || "Account ban gaya! Ab login karein.";
-            statusMsg.classList.remove('hidden');
-            setTimeout(() => setMode(true), 1500);
-          }
+          window.location.href = '/dashboard.html';
         } else {
-          statusMsg.className = "text-xs text-center p-2.5 rounded-lg bg-rose-500/20 text-rose-400 border border-rose-500/30";
-          statusMsg.innerText = data.error || "Galat details ya passcode!";
-          statusMsg.classList.remove('hidden');
+          alert('Error: ' + (data.error || 'Login failed'));
         }
       } catch (err) {
-        statusMsg.className = "text-xs text-center p-2.5 rounded-lg bg-rose-500/20 text-rose-400 border border-rose-500/30";
-        statusMsg.innerText = "Server connection error.";
-        statusMsg.classList.remove('hidden');
+        alert('Server se connect karne me problem aayi.');
+      }
+    }
+
+    // Register Action
+    async function handleRegister(e) {
+      e.preventDefault();
+      const body = {
+        name: document.getElementById('regName').value.trim(),
+        email: document.getElementById('regEmail').value.trim(),
+        phone: document.getElementById('regPhone').value.trim(),
+        gmail: document.getElementById('regGmail').value.trim(),
+        password: document.getElementById('regPass').value,
+        office_code: document.getElementById('regOfficeCode').value.trim()
+      };
+
+      try {
+        const res = await fetch('/api/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+
+        const data = await res.json();
+        alert(data.message || data.error);
+        if (res.ok) {
+          toggleFormView();
+          document.getElementById('loginEmail').value = body.email;
+        }
+      } catch (err) {
+        alert('Server error while registering.');
+      }
+    }
+
+    // Reset Password Action
+    function openResetModal() { document.getElementById('resetModal').classList.remove('hidden'); }
+    function closeResetModal() { document.getElementById('resetModal').classList.add('hidden'); }
+
+    async function handleReset(e) {
+      e.preventDefault();
+      const body = {
+        email: document.getElementById('resetEmail').value.trim(),
+        office_code: document.getElementById('resetOfficeCode').value.trim(),
+        new_password: document.getElementById('resetNewPass').value
+      };
+
+      try {
+        const res = await fetch('/api/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+
+        const data = await res.json();
+        alert(data.message || data.error);
+        if (res.ok) {
+          closeResetModal();
+          document.getElementById('loginEmail').value = body.email;
+        }
+      } catch (err) {
+        alert('Error connecting to reset API.');
       }
     }
   </script>
