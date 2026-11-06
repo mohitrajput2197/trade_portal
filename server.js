@@ -16,7 +16,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ==========================================
 // 1. DATABASE CONFIGURATION (HEROKU POSTGRES)
 // ==========================================
-const herokuPostgresUrl = 'postgres://ucm8tmsvih2ol7:pf361b642d6f57e4eb6831650c9756630f9c82d7e5fbebd552e7308a719f3e5f8@cemv7jmv0b38gs.cluster-czrs8kj4isg7.us-east-1.rds.amazonaws.com:5432/d5sqh1meoa49i3';
+const herokuPostgresUrl = 'postgresql://neondb_owner:npg_XNSiaWtYf3A5@ep-holy-poetry-bdp5qv4o-pooler.c-8.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
 let dbConnectionString = process.env.DATABASE_URL || herokuPostgresUrl;
 
 // Heroku postgres:// ko postgresql:// me format karna
